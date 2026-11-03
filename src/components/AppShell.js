@@ -7,6 +7,7 @@ const TABS = [
   { href: '/', label: 'Tổng quan', icon: '🏠' },
   { href: '/so-tien', label: 'Sổ tiền', icon: '💰' },
   { href: '/hui', label: 'Hụi', icon: '🔄' },
+  { href: '/tinh-nhanh', label: 'Tính nhanh', icon: '🧮' },
   { href: '/bao-cao', label: 'Báo cáo', icon: '📊' },
 ];
 
