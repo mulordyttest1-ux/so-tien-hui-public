@@ -48,13 +48,19 @@ export default function SoTienPage() {
       note: editing.note || '',
     };
     try {
+      let saved = null;
       if (editing.id) {
-        const { error } = await supabase.from('transactions').update(payload).eq('id', editing.id);
+        const { data, error } = await supabase.from('transactions').update(payload).eq('id', editing.id).select().single();
         if (error) throw error;
+        saved = data;
       } else {
-        const { error } = await supabase.from('transactions').insert(payload);
+        const { data, error } = await supabase.from('transactions').insert(payload).select().single();
         if (error) throw error;
+        saved = data;
       }
+      // Cập nhật danh sách ngay tại chỗ bằng chính bản ghi server vừa trả về,
+      // rồi tải lại toàn bộ để đồng bộ (không phụ thuộc cache).
+      if (saved) setTxs(prev => [saved, ...prev.filter(t => t.id !== saved.id)]);
       setEditing(null); await load();
     } catch (err) { alert('Không lưu được: ' + err.message); }
   }
