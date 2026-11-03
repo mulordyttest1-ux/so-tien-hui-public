@@ -34,13 +34,18 @@ export default function HuiPage() {
       start_date: editingGroup.start_date || null, note: editingGroup.note || '',
     };
     try {
+      let saved = null;
       if (editingGroup.id) {
-        const { error } = await supabase.from('hui_groups').update(payload).eq('id', editingGroup.id);
+        const { data, error } = await supabase.from('hui_groups').update(payload).eq('id', editingGroup.id).select().single();
         if (error) throw error;
+        saved = data;
       } else {
-        const { error } = await supabase.from('hui_groups').insert(payload);
+        const { data, error } = await supabase.from('hui_groups').insert(payload).select().single();
         if (error) throw error;
+        saved = data;
       }
+      // Hiện dây hụi mới ngay tại chỗ, rồi tải lại để đồng bộ.
+      if (saved) setGroups(prev => [saved, ...prev.filter(g => g.id !== saved.id)]);
       setEditingGroup(null); await load();
     } catch (err) { alert('Không lưu được dây hụi: ' + err.message); }
   }
@@ -56,7 +61,7 @@ export default function HuiPage() {
     e.preventDefault();
     const { group, round } = roundFor;
     try {
-      await saveHuiRound({
+      const saved = await saveHuiRound({
         group, userId: user.id,
         round: {
           ...(round.id ? { id: round.id } : {}),
@@ -68,6 +73,7 @@ export default function HuiPage() {
           note: round.note || '',
         },
       });
+      if (saved) setRounds(prev => [saved, ...prev.filter(r => r.id !== saved.id)]);
       setRoundFor(null); await load();
     } catch (err) { alert('Không lưu được kỳ hụi: ' + err.message); }
   }
