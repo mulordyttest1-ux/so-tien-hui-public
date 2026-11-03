@@ -1,0 +1,1 @@
+{"dependencies":{"@supabase/supabase-js":"^2.45.0","next":"^15.1.0","react":"^19.0.0","react-dom":"^19.0.0"},"description":"Sổ Tiền & Hụi — app public nhiều người dùng: mỗi tài khoản 1 sổ riêng (Next.js + Supabase)","name":"so-tien-hui-public","private":true,"scripts":{"build":"next build","dev":"next dev","lint":"next lint","start":"next start"},"version":"1.0.0"}
