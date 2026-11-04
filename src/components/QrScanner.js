@@ -26,6 +26,7 @@ export default function QrScanner({ onScan, onClose }) {
   const [camIndex, setCamIndex] = useState(0);
   const [activeLabel, setActiveLabel] = useState('');
   const [switching, setSwitching] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const videoRef = useRef(null);
   const readerRef = useRef(null);
   const camerasRef = useRef([]);
@@ -59,6 +60,15 @@ export default function QrScanner({ onScan, onClose }) {
   }
 
   useEffect(() => {
+    // Phat hien che do app (mo bang bieu tuong man hinh chinh): iOS khong giu
+    // quyen camera o che do nay nen quet truc tiep co the khong len hinh — luc
+    // do nut chup bang camera may (ben duoi) la duong chac chan nhat.
+    try {
+      setIsStandalone(
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true,
+      );
+    } catch { /* bo qua */ }
     let cancelled = false;
     async function start() {
       try {
@@ -128,6 +138,12 @@ export default function QrScanner({ onScan, onClose }) {
     <div className="card" style={{ textAlign: 'center' }}>
       <h3>Quét mã QR</h3>
       <p className="muted">Đưa mã QR vào khung hình. App tự đọc ngay khi nhận diện được.</p>
+      {isStandalone && (
+        <div style={{ border: '2px solid #168250', background: '#f0fdf4', borderRadius: 12, padding: 10, marginBottom: 10, textAlign: 'left' }}>
+          <b>📱 Bạn đang mở bằng biểu tượng màn hình chính.</b>
+          <span className="muted"> iOS không giữ quyền camera ở chế độ này nên quét trực tiếp có thể không lên hình. Cách chắc chắn nhất: bấm nút <b>“Chụp mã QR bằng camera máy”</b> bên dưới — camera của máy sẽ mở ra, chụp mã là app đọc được, không cần quyền trình duyệt.</span>
+        </div>
+      )}
       <div style={{ position: 'relative', maxWidth: 420, margin: '0 auto' }}>
         <video ref={videoRef} muted autoPlay playsInline
           style={{ width: '100%', borderRadius: 12, background: '#000', display: error ? 'none' : 'block' }} />
@@ -141,15 +157,20 @@ export default function QrScanner({ onScan, onClose }) {
       {starting && <div className="muted">Đang mở camera sau… (trình duyệt có thể hỏi quyền camera)</div>}
       {activeLabel && !error && <div className="muted" style={{ marginTop: 6 }}>Đang dùng: {activeLabel}</div>}
       {error && <div style={{ color: '#991b1b', marginTop: 8 }}>{error}</div>}
+      {error && isStandalone && (
+        <div className="muted" style={{ marginTop: 6 }}>
+          Mẹo: bấm nút “Chụp mã QR bằng camera máy” bên dưới — trên iPhone nó mở thẳng camera của máy, không cần quyền trình duyệt.
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         {cameras.length > 1 && (
           <button type="button" className="btn secondary small" disabled={switching} onClick={switchCamera}>
             🔄 Đổi camera {switching ? '…' : ''}
           </button>
         )}
-        <label className="btn secondary small" style={{ cursor: 'pointer' }}>
-          Chọn ảnh QR từ thư viện
-          <input type="file" accept="image/*" style={{ display: 'none' }}
+        <label className={isStandalone ? 'btn' : 'btn secondary small'} style={{ cursor: 'pointer' }}>
+          {isStandalone ? '📷 Chụp mã QR bằng camera máy' : 'Chọn ảnh QR từ thư viện'}
+          <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
             onChange={e => scanFile(e.target.files?.[0])} />
         </label>
         <button type="button" className="btn secondary small" onClick={onClose}>Đóng</button>
