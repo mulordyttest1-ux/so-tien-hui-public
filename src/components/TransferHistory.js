@@ -4,7 +4,7 @@
 // thể đang xem (người / hụi / kỳ / giao dịch / tài khoản) và tự truy vấn payments
 // theo trường liên kết đó. Thêm thực thể mới sau này chỉ cần thêm trường lọc.
 import { useState } from 'react';
-import { confirmPayment, voidPayment, VOID_REASONS, pendingAgeLabel } from '../lib/payments';
+import { confirmPayment, voidPayment, deletePayment, VOID_REASONS, pendingAgeLabel } from '../lib/payments';
 import { fmtVND, personDisplay } from '../lib/format';
 
 function statusBadge(p) {
@@ -21,6 +21,7 @@ function statusBadge(p) {
 export default function TransferHistory({ payments, accounts, persons, groups, userId, onChanged, showActions = true }) {
   const [voiding, setVoiding] = useState(null);
   const [confirming, setConfirming] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [voidReason, setVoidReason] = useState('abandoned');
   const [busy, setBusy] = useState(false);
 
@@ -68,6 +69,24 @@ export default function TransferHistory({ payments, accounts, persons, groups, u
               </button>
               <button className="btn secondary small" disabled={busy} onClick={() => setVoiding(p.id)}>Hủy lệnh</button>
               <a className="btn secondary small" href={`/chuyen-khoan/${p.id}`}>Mở lại mã QR</a>
+              <button className="btn danger small" disabled={busy} onClick={() => setDeleting(p.id)}>Xóa</button>
+            </div>
+          )}
+          {showActions && (p.status === 'voided' || p.status === 'confirmed') && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <button className="btn danger small" disabled={busy} onClick={() => setDeleting(p.id)}>Xóa</button>
+            </div>
+          )}
+          {showActions && deleting === p.id && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="muted">{p.status === 'confirmed'
+                ? 'Lệnh này đã chuyển thành công — xóa sẽ gỡ cả khoản sổ đã chốt (và tiền đóng hụi của kỳ này nếu có). Vẫn xóa?'
+                : 'Xóa hẳn lệnh này và khoản sổ liên quan? Lệnh chưa chuyển tiền nên xóa không làm lệch số đã chốt.'}</span>
+              <button className="btn danger small" disabled={busy}
+                onClick={() => act(deletePayment, p).then(() => setDeleting(null))}>
+                Xóa hẳn
+              </button>
+              <button className="btn secondary small" onClick={() => setDeleting(null)}>Giữ lại</button>
             </div>
           )}
           {showActions && confirming === p.id && (
