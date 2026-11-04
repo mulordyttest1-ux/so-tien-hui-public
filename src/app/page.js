@@ -51,6 +51,14 @@ export default function DashboardPage() {
         </div>
       )}
       <div className="card">
+        <h3>📱 Nút Quét QR ngoài màn hình chính iPhone</h3>
+        <p className="muted" style={{ lineHeight: 1.8 }}>
+          Muốn bấm một cái ngoài màn hình chính là quét ngay? Mở trang Quét QR bằng Safari rồi
+          Chia sẻ → Thêm vào Màn hình chính (hướng dẫn chi tiết ở trong trang đó).
+        </p>
+        <Link className="btn" href="/quet-qr">📷 Mở trang Quét QR</Link>
+      </div>
+      <div className="card">
         <div className="muted">Còn lại tháng này</div>
         <div className="big">{fmtVND(monthThu - monthChi)}</div>
         <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
