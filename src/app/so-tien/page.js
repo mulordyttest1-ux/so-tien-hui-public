@@ -57,6 +57,21 @@ export default function SoTienPage() {
   async function save(e) {
     e.preventDefault();
     if (!editing.amount || Number(editing.amount) < 1) { alert('Nhập số tiền lớn hơn 0.'); return; }
+    // Khoan gan lenh CK: chi duoc bo sung truong mo ta (nguoi/hang muc/nguon/ghi chu).
+    // So tien / ngay / loai khoa theo lenh chuyen that, sua la so lech voi ngan hang.
+    if (editing.id && editing.payment_id) {
+      const payload = {
+        person_id: editing.person_id || null, category_id: editing.category_id || null,
+        source_id: editing.source_id || null, note: editing.note || '',
+      };
+      try {
+        const { data, error } = await supabase.from('transactions').update(payload).eq('id', editing.id).select().single();
+        if (error) throw error;
+        setTxs(prev => [data, ...prev.filter(t => t.id !== data.id)]);
+        setEditing(null); await load();
+      } catch (err) { alert('Không lưu được: ' + err.message); }
+      return;
+    }
     // Khoan chi moi + che do chuyen khoan: khong luu thang ma qua man hinh xem lai.
     if (payMode && !editing.id && editing.type === 'chi') {
       if (!payAccountId) { alert('Chọn tài khoản ngân hàng nhận tiền.'); return; }
@@ -173,7 +188,6 @@ export default function SoTienPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <button className="btn secondary small" onClick={() => {
-                if (t.payment_id) { alert('Khoản này gắn với lệnh chuyển khoản — hãy chốt hoặc hủy lệnh ở tab Ngân hàng, không sửa riêng ở đây.'); return; }
                 setEditing({ ...t, amount: String(t.amount) });
               }}>Sửa</button>
               <button className="btn danger small" onClick={() => remove(t)}>Xóa</button>
@@ -185,7 +199,7 @@ export default function SoTienPage() {
       {showReview && editing && (() => {
         const acc = accounts.find(a => a.id === payAccountId);
         return (
-          <div className="modal-bg" onClick={() => setShowReview(false)}>
+          <div className="modal-bg modal-top" onClick={() => setShowReview(false)}>
             <div className="modal" onClick={e => e.stopPropagation()}>
               <h2>Xem lại trước khi chuyển</h2>
               <p className="muted" style={{ lineHeight: 1.8 }}>
@@ -216,17 +230,25 @@ export default function SoTienPage() {
         <div className="modal-bg" onClick={() => setEditing(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h2>{editing.id ? 'Sửa khoản' : 'Ghi khoản mới'}</h2>
+            {editing.payment_id && (
+              <p className="muted">
+                Khoản này gắn với lệnh chuyển khoản — chỉ bổ sung được người / hạng mục / nguồn / ghi chú.
+                Số tiền, ngày và loại thu/chi đã khóa theo lệnh chuyển thật.
+              </p>
+            )}
             <form onSubmit={save}>
               <div className="seg">
-                <button type="button" className={editing.type === 'thu' ? 'on-thu' : ''} onClick={() => setEditing({ ...editing, type: 'thu' })}>Thu vào</button>
-                <button type="button" className={editing.type === 'chi' ? 'on-chi' : ''} onClick={() => setEditing({ ...editing, type: 'chi' })}>Chi ra</button>
+                <button type="button" disabled={!!editing.payment_id} className={editing.type === 'thu' ? 'on-thu' : ''} onClick={() => setEditing({ ...editing, type: 'thu' })}>Thu vào</button>
+                <button type="button" disabled={!!editing.payment_id} className={editing.type === 'chi' ? 'on-chi' : ''} onClick={() => setEditing({ ...editing, type: 'chi' })}>Chi ra</button>
               </div>
               <label className="field"><span>Số tiền (đ)</span>
-                <MoneyInput value={editing.amount}
-                  onChange={v => setEditing({ ...editing, amount: v })} placeholder="VD: 500.000" />
+                {editing.payment_id
+                  ? <div><b>{fmtVND(editing.amount)}</b> <span className="muted">(đã khóa theo lệnh CK)</span></div>
+                  : <MoneyInput value={editing.amount}
+                    onChange={v => setEditing({ ...editing, amount: v })} placeholder="VD: 500.000" />}
               </label>
               <label className="field"><span>Ngày</span>
-                <input type="date" required value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} />
+                <input type="date" required disabled={!!editing.payment_id} value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} />
               </label>
               <TagSelect label="Người" table="persons" items={tags.persons} userId={user.id}
                 value={editing.person_id} onChange={v => setEditing({ ...editing, person_id: v })} onCreated={addTagTo('persons')} />
