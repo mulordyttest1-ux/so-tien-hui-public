@@ -10,7 +10,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { fetchTags } from '../../lib/data';
 import { fetchBankAccounts, fetchPayments, pendingAgeLabel } from '../../lib/payments';
 import Link from 'next/link';
-import { BANKS, bankByCode, parseVietQR } from '../../lib/vietqr';
+import { BANKS, bankByCode, parseVietQR, getSenderBankApp, saveSenderBankApp, clearSenderBankApp } from '../../lib/vietqr';
+import SenderBankChooser from '../../components/SenderBankChooser';
 import { fmtVND, PERSON_KIND_LABELS, personDisplay } from '../../lib/format';
 
 const EMPTY_ACC = { person_id: '', bank_code: 'VCB', account_number: '', holder_name: '', note: '' };
@@ -28,6 +29,9 @@ export default function NganHangPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [cpName, setCpName] = useState('');
   const [cpKind, setCpKind] = useState('nguoi');
+  // App ngan hang cua NGUOI CHUYEN (ban), luu tren may nay.
+  const [senderApp, setSenderApp] = useState(null);
+  const [chooserOpen, setChooserOpen] = useState(false);
 
   async function load() {
     const [acc, pay, tg, grp] = await Promise.all([
@@ -37,7 +41,7 @@ export default function NganHangPage() {
     setAccounts(acc); setPayments(pay); setPersons(tg.persons);
     setGroups(grp.data || []); setReady(true);
   }
-  useEffect(() => { if (user) load().catch(e => alert(e.message)); }, [user]);
+  useEffect(() => { if (user) load().catch(e => alert(e.message)); setSenderApp(getSenderBankApp()); }, [user]);
 
   const pending = useMemo(() => payments.filter(p => p.status === 'pending'), [payments]);
   const overdue = useMemo(() => pending.filter(p => pendingAgeLabel(p.created_at) === 'over7'), [pending]);
@@ -115,6 +119,32 @@ export default function NganHangPage() {
           <span className="muted"> — tổng {fmtVND(pending.reduce((s, p) => s + Number(p.amount), 0))} chưa tính vào số đã chốt.</span>
         </div>
       )}
+
+      <div className="card">
+        <h3>Ngân hàng của tôi</h3>
+        <p className="muted">App bạn dùng để chuyển tiền — khác với tài khoản của người nhận ở dưới. Chỉ lưu tên app trên thiết bị này, không lưu số tài khoản hay mật khẩu của bạn.</p>
+        {senderApp ? (
+          <div>
+            <b>{senderApp.appName}</b>
+            {senderApp.autofill ? <span> · <b>Tự động điền</b></span> : <span className="muted"> · Mở app, tự nhập</span>}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <button className="btn secondary small" onClick={() => setChooserOpen(true)}>Đổi</button>
+              <button className="btn danger small" onClick={() => { clearSenderBankApp(); setSenderApp(null); }}>Xóa</button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="muted">Chưa chọn — bạn sẽ được hỏi ở lần chuyển khoản đầu tiên.</div>
+            <button className="btn small" style={{ marginTop: 8 }} onClick={() => setChooserOpen(true)}>Chọn ngay</button>
+          </div>
+        )}
+        <SenderBankChooser
+          open={chooserOpen}
+          currentAppId={senderApp?.appId}
+          onClose={() => setChooserOpen(false)}
+          onSelect={(app) => { saveSenderBankApp(app); setSenderApp(app); setChooserOpen(false); }}
+        />
+      </div>
 
       <div className="card">
         <h3>Đối tác (người / công ty / shop)</h3>
