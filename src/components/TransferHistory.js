@@ -5,7 +5,7 @@
 // theo trường liên kết đó. Thêm thực thể mới sau này chỉ cần thêm trường lọc.
 import { useState } from 'react';
 import { confirmPayment, voidPayment, VOID_REASONS, pendingAgeLabel } from '../lib/payments';
-import { fmtVND } from '../lib/format';
+import { fmtVND, personDisplay } from '../lib/format';
 
 function statusBadge(p) {
   if (p.status === 'confirmed') return <span className="badge-ok">Đã xác nhận</span>;
@@ -20,6 +20,7 @@ function statusBadge(p) {
 
 export default function TransferHistory({ payments, accounts, persons, groups, userId, onChanged, showActions = true }) {
   const [voiding, setVoiding] = useState(null);
+  const [confirming, setConfirming] = useState(null);
   const [voidReason, setVoidReason] = useState('abandoned');
   const [busy, setBusy] = useState(false);
 
@@ -27,7 +28,7 @@ export default function TransferHistory({ payments, accounts, persons, groups, u
     const a = (accounts || []).find(x => x.id === id);
     return a ? `${a.bank_name} · ${a.account_number}${a.holder_name ? ` (${a.holder_name})` : ''}` : '(tài khoản đã xóa)';
   };
-  const personName = (id) => (persons || []).find(x => x.id === id)?.name || '';
+  const personName = (id) => personDisplay((persons || []).find(x => x.id === id));
   const groupName = (id) => (groups || []).find(x => x.id === id)?.name || '';
 
   async function act(fn, p, extra) {
@@ -62,12 +63,21 @@ export default function TransferHistory({ payments, accounts, persons, groups, u
           </div>
           {showActions && p.status === 'pending' && (
             <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              <button className="btn small" disabled={busy}
-                onClick={() => { if (confirm('Bạn đã chuyển khoản này bên app ngân hàng rồi, đúng không? Chỉ bấm khi tiền thật sự đã đi.')) act(confirmPayment, p); }}>
+              <button className="btn small" disabled={busy} onClick={() => setConfirming(p.id)}>
                 Đã chuyển — Xác nhận
               </button>
               <button className="btn secondary small" disabled={busy} onClick={() => setVoiding(p.id)}>Hủy lệnh</button>
               <a className="btn secondary small" href={`/chuyen-khoan/${p.id}`}>Mở lại mã QR</a>
+            </div>
+          )}
+          {showActions && confirming === p.id && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="muted">Tiền thật sự đã đi bên app ngân hàng rồi?</span>
+              <button className="btn small" disabled={busy}
+                onClick={() => act(confirmPayment, p).then(() => setConfirming(null))}>
+                Đúng, đã chuyển
+              </button>
+              <button className="btn secondary small" onClick={() => setConfirming(null)}>Chưa, để sau</button>
             </div>
           )}
           {voiding === p.id && (

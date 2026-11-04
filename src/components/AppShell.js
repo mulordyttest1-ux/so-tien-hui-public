@@ -1,7 +1,9 @@
 'use client';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
+import QrScanner from './QrScanner';
 
 const TABS = [
   { href: '/', label: 'Tổng quan', icon: '🏠' },
@@ -15,6 +17,15 @@ const TABS = [
 export default function AppShell({ children, userEmail }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [showScanner, setShowScanner] = useState(false);
+
+  // Nut quet QR noi bat tren moi man hinh: bam la mo camera ngay, khong qua
+  // tab trung gian. Quet xong thi sang trang Chuyen nhanh voi ma QR da doc.
+  function handleScanned(text) {
+    setShowScanner(false);
+    try { sessionStorage.setItem('pendingQr', text); } catch { /* bo qua */ }
+    router.push('/chuyen-nhanh');
+  }
 
   async function logout() {
     await supabase.auth.signOut();
@@ -31,6 +42,15 @@ export default function AppShell({ children, userEmail }) {
         </span>
       </header>
       <main className="content">{children}</main>
+      <button type="button" className="qr-fab" aria-label="Quét mã QR để chuyển tiền"
+        onClick={() => setShowScanner(true)}>
+        📷
+      </button>
+      {showScanner && (
+        <div className="qr-overlay">
+          <QrScanner onScan={handleScanned} onClose={() => setShowScanner(false)} />
+        </div>
+      )}
       <nav className="bottomnav">
         {TABS.map(t => (
           <Link key={t.href} href={t.href}
