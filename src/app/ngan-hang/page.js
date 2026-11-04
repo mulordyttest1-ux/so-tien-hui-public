@@ -5,11 +5,13 @@ import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../../components/AppShell';
 import { useRequireAuth } from '../../components/useRequireAuth';
 import TransferHistory from '../../components/TransferHistory';
+import QrScanner from '../../components/QrScanner';
 import { supabase } from '../../lib/supabaseClient';
 import { fetchTags } from '../../lib/data';
 import { fetchBankAccounts, fetchPayments, pendingAgeLabel } from '../../lib/payments';
+import Link from 'next/link';
 import { BANKS, bankByCode, parseVietQR } from '../../lib/vietqr';
-import { fmtVND } from '../../lib/format';
+import { fmtVND, PERSON_KIND_LABELS, personDisplay } from '../../lib/format';
 
 const EMPTY_ACC = { person_id: '', bank_code: 'VCB', account_number: '', holder_name: '', note: '' };
 
@@ -23,7 +25,9 @@ export default function NganHangPage() {
   const [editing, setEditing] = useState(null);
   const [fPerson, setFPerson] = useState('');
   const [fStatus, setFStatus] = useState('');
-  const [qrPaste, setQrPaste] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+  const [cpName, setCpName] = useState('');
+  const [cpKind, setCpKind] = useState('nguoi');
 
   async function load() {
     const [acc, pay, tg, grp] = await Promise.all([
@@ -72,8 +76,15 @@ export default function NganHangPage() {
     if (error) alert(error.message); else load();
   }
 
-  function pasteQr() {
-    const r = parseVietQR(qrPaste);
+  async function addCounterparty() {
+    if (!cpName.trim()) { alert('Nhập tên đối tác.'); return; }
+    const { error } = await supabase.from('persons').insert({ user_id: user.id, name: cpName.trim(), kind: cpKind });
+    if (error) alert('Không thêm được: ' + error.message);
+    else { setCpName(''); await load(); }
+  }
+
+  function fillFromQr(text) {
+    const r = parseVietQR(text);
     if (!r.bin || !r.accountNumber) { alert('Không đọc được mã QR này (thiếu ngân hàng hoặc số tài khoản).'); return; }
     const bank = BANKS.find(b => b.bin === r.bin);
     setEditing({
@@ -83,13 +94,15 @@ export default function NganHangPage() {
       note: r.memo ? `Từ mã QR: ${r.memo}` : '',
     });
     if (!r.crcOk) alert('Lưu ý: mã QR này sai checksum (có thể đã bị sửa). Hãy kiểm tra lại số tài khoản trước khi dùng.');
-    setQrPaste('');
   }
 
   if (loading || !user) return <div className="loading">Đang tải…</div>;
 
   return (
     <AppShell userEmail={user.email}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Link className="btn" href="/chuyen-nhanh">⚡ Chuyển nhanh (chuyển trước, nhập sau)</Link>
+      </div>
       {overdue.length > 0 && (
         <div className="card" style={{ border: '2px solid #c2410c', background: '#fff7ed' }}>
           <b>⚠️ Có {overdue.length} lệnh chờ xác nhận đã quá 7 ngày.</b>
@@ -104,6 +117,21 @@ export default function NganHangPage() {
       )}
 
       <div className="card">
+        <h3>Đối tác (người / công ty / shop)</h3>
+        <p className="muted">Đây là chiều quản lý của bạn — khác với tên chủ tài khoản theo ngân hàng. Một đối tác có thể có nhiều tài khoản.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input style={{ flex: 1 }} value={cpName} onChange={e => setCpName(e.target.value)} placeholder="Tên đối tác mới (VD: Shop gạo, Cty ABC...)" />
+          <select value={cpKind} onChange={e => setCpKind(e.target.value)}>
+            {Object.entries(PERSON_KIND_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <button className="btn small" onClick={addCounterparty}>+ Thêm</button>
+        </div>
+        <div className="muted" style={{ marginTop: 6 }}>
+          {persons.map(p => personDisplay(p)).join(' · ') || 'Chưa có đối tác nào.'}
+        </div>
+      </div>
+
+      <div className="card">
         <h3>Tài khoản ngân hàng đã lưu</h3>
         <p className="muted">Mỗi tài khoản gắn với 1 người (người nhận tiền). Chủ tài khoản có thể khác người đó — ví dụ tài khoản của chị B, kế toán của chị C.</p>
         {accounts.length === 0 && <div className="empty">Chưa có tài khoản nào. Bấm + để thêm.</div>}
@@ -112,7 +140,7 @@ export default function NganHangPage() {
             <span><b>{a.bank_name}</b> · {a.account_number}
               <br /><span className="muted">
                 {a.holder_name ? `Chủ TK: ${a.holder_name}` : ''}
-                {persons.find(p => p.id === a.person_id) ? ` · Nhận cho: ${persons.find(p => p.id === a.person_id).name}` : ''}
+                {persons.find(p => p.id === a.person_id) ? ` · Nhận cho: ${personDisplay(persons.find(p => p.id === a.person_id))}` : ''}
                 {a.note ? ` · ${a.note}` : ''}
               </span>
             </span>
@@ -130,7 +158,7 @@ export default function NganHangPage() {
         <div className="filters">
           <select value={fPerson} onChange={e => setFPerson(e.target.value)}>
             <option value="">Mọi người</option>
-            {persons.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {persons.map(p => <option key={p.id} value={p.id}>{personDisplay(p)}</option>)}
           </select>
           <select value={fStatus} onChange={e => setFStatus(e.target.value)}>
             <option value="">Mọi trạng thái</option>
@@ -153,7 +181,7 @@ export default function NganHangPage() {
               <label className="field"><span>Nhận tiền cho người</span>
                 <select value={editing.person_id} onChange={e => setEditing({ ...editing, person_id: e.target.value })}>
                   <option value="">(chưa gắn người nào)</option>
-                  {persons.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {persons.map(p => <option key={p.id} value={p.id}>{personDisplay(p)}</option>)}
                 </select>
               </label>
               <label className="field"><span>Ngân hàng</span>
@@ -180,10 +208,13 @@ export default function NganHangPage() {
               </div>
             </form>
             <div style={{ marginTop: 16 }}>
-              <label className="field"><span>Hoặc dán nội dung mã QR VietQR của người nhận</span>
-                <input value={qrPaste} onChange={e => setQrPaste(e.target.value)} placeholder="Dán chuỗi mã QR (bắt đầu bằng 000201...)" />
-              </label>
-              <button type="button" className="btn secondary small" onClick={pasteQr}>Tách thông tin từ mã QR</button>
+              <button type="button" className="btn secondary small" onClick={() => setShowScanner(true)}>📷 Quét mã QR VietQR để tự điền</button>
+              {showScanner && (
+                <QrScanner
+                  onScan={(text) => { setShowScanner(false); fillFromQr(text); }}
+                  onClose={() => setShowScanner(false)}
+                />
+              )}
             </div>
           </div>
         </div>
