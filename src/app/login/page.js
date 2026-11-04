@@ -1,10 +1,18 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 
-export default function LoginPage() {
+// Chi cho phep quay lai duong dan noi bo (chan open-redirect qua ?next=).
+function safeNext(raw) {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get('next'));
   const [mode, setMode] = useState('login'); // login | register
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,11 +30,11 @@ export default function LoginPage() {
         if (!data.session) {
           setNotice('Đã đăng ký. Kiểm tra email để xác nhận tài khoản, rồi quay lại đăng nhập.');
           setMode('login');
-        } else router.replace('/');
+        } else router.replace(next);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        router.replace('/');
+        router.replace(next);
       }
     } catch (err) {
       setError(err.message || 'Có lỗi xảy ra, thử lại nhé.');
@@ -70,5 +78,13 @@ export default function LoginPage() {
         </a>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="loading">Đang tải…</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
