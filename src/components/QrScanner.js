@@ -38,7 +38,7 @@ export default function QrScanner({ onScan, onClose }) {
       return 'Trình duyệt chưa được phép dùng camera. Hãy bấm “Cho phép” khi trình duyệt hỏi. Nếu vẫn hỏi lại mỗi lần mở, vào Safari → nút aA → Cài đặt trang web → Camera → chọn “Cho phép” (thay vì “Hỏi”) thì từ sau không hỏi nữa.';
     }
     if (/secure|https|NotSupported/i.test(msg)) {
-      return 'Quét camera cần mở app qua HTTPS. Hãy mở app bằng link https://so-tien-hui-public.vercel.app.';
+      return 'Quét camera cần mở app qua HTTPS. Hãy mở app bằng link https://gia-dinh-nho-cua-gold.vercel.app.';
     }
     if (/NotFound|not found|no camera|Requested device/i.test(msg)) {
       return 'Không tìm thấy camera trên thiết bị này. Hãy dùng nút “Chọn ảnh QR” bên dưới.';
