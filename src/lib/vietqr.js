@@ -53,15 +53,122 @@ export function bankByCode(code) {
   return BANKS.find(b => b.code === code) || null;
 }
 
-// App ngan hang iOS ho tro deeplink kem tu dien (autofill=1 theo
-// api.vietqr.io/v2/ios-app-deeplinks). Cac ngan hang khac van quet duoc ma QR.
-export const DEEPLINK_AUTOFILL = {
-  MB: { appId: 'mb', appName: 'MB Bank' },
-  ICB: { appId: 'icb', appName: 'VietinBank iPay' },
-  BIDV: { appId: 'bidv', appName: 'BIDV SmartBanking' },
-  ACB: { appId: 'acb', appName: 'ACB ONE' },
-  OCB: { appId: 'ocb', appName: 'OCB OMNI' },
-};
+// App ngan hang cua NGUOI CHUYEN (sender) cho VietQR Deeplink.
+// QUAN TRONG: tham so `app` cua dl.vietqr.io la app cua nguoi chuyen,
+// khong phai ngan hang nguoi nhan. Ngan hang nguoi nhan nam o tham so
+// `bank` rieng. Dung appId tu danh sach cua VietQR theo dung he dieu
+// hanh (ios-app-deeplinks / android-app-deeplinks); appId khong phai
+// luc nao cung trung ma ngan hang (VD: MyVIB la `vib-2`).
+//
+// Danh sach du phong co san trong app: chi gom cac appId da duoc kiem
+// chung tu nghien cuu 2026-11-04. Neu tai duoc danh sach moi tu
+// api.vietqr.io thi dung danh sach do; neu khong tai duoc (VD: trinh
+// duyet chan CORS) thi dung danh sach nay.
+export const BUNDLED_SENDER_APPS = [
+  { appId: 'mb', appName: 'MB Bank', autofill: true },
+  { appId: 'icb', appName: 'VietinBank iPay', autofill: true },
+  { appId: 'bidv', appName: 'BIDV SmartBanking', autofill: true },
+  { appId: 'acb', appName: 'ACB ONE', autofill: true },
+  { appId: 'ocb', appName: 'OCB OMNI', autofill: true },
+  { appId: 'vcb', appName: 'VCB Digibank', autofill: false },
+  { appId: 'tcb', appName: 'Techcombank Mobile', autofill: false },
+  { appId: 'vpb', appName: 'VPBank NEO', autofill: false },
+  { appId: 'vib-2', appName: 'MyVIB', autofill: false },
+  { appId: 'tpb', appName: 'TPBank Mobile', autofill: false },
+  { appId: 'vba', appName: 'Agribank Plus', autofill: false },
+  { appId: 'cake', appName: 'CAKE by VPBank', autofill: false },
+  { appId: 'timo', appName: 'Timo', autofill: false },
+  { appId: 'shbvn', appName: 'ShinhanBank', autofill: false },
+];
+
+const SENDER_APP_KEY = 'sotienhui.senderBankApp';
+const SENDER_LIST_CACHE_KEY = 'sotienhui.senderAppList';
+const SENDER_LIST_TTL_MS = 12 * 60 * 60 * 1000;
+
+export function detectSenderOS() {
+  if (typeof navigator === 'undefined') return 'desktop';
+  const ua = navigator.userAgent || '';
+  if (/android/i.test(ua)) return 'android';
+  if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+  return 'desktop';
+}
+
+export function isPhoneOS() {
+  const os = detectSenderOS();
+  return os === 'ios' || os === 'android';
+}
+
+// Lua chon app cua nguoi chuyen, luu TREN MAY NAY (localStorage).
+// Chi luu appId + ten + co tu dien hay khong; KHONG luu so TK hay
+// mat khau cua nguoi chuyen (khong can — app ngan hang da biet).
+export function getSenderBankApp() {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = window.localStorage.getItem(SENDER_APP_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    if (!v || typeof v.appId !== 'string') return null;
+    return v;
+  } catch { return null; }
+}
+
+export function saveSenderBankApp(app) {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SENDER_APP_KEY, JSON.stringify({
+      appId: app.appId, appName: app.appName,
+      bankName: app.bankName || '', autofill: !!app.autofill,
+      os: detectSenderOS(), updatedAt: new Date().toISOString(),
+    }));
+  } catch { /* bo qua: may chan localStorage thi hoi lai lan sau */ }
+}
+
+export function clearSenderBankApp() {
+  try { window.localStorage.removeItem(SENDER_APP_KEY); } catch { /* bo qua */ }
+}
+
+function normalizeListEntry(e) {
+  if (!e || typeof e.appId !== 'string') return null;
+  return {
+    appId: e.appId,
+    appName: e.appName || e.bankName || e.appId,
+    bankName: e.bankName || '',
+    appLogo: e.appLogo || '',
+    autofill: e.autofill === 1 || e.autofill === true,
+  };
+}
+
+// Lay danh sach app deeplink theo dung OS. Uu tien danh sach moi tu
+// VietQR (cache 12h); tai khong duoc thi dung danh sach co san.
+export async function fetchSenderAppList() {
+  const os = detectSenderOS();
+  try {
+    if (typeof window !== 'undefined') {
+      const cached = JSON.parse(window.localStorage.getItem(SENDER_LIST_CACHE_KEY) || 'null');
+      if (cached && cached.os === os && Array.isArray(cached.apps) && Date.now() - cached.at < SENDER_LIST_TTL_MS) {
+        return { apps: cached.apps, source: 'cache' };
+      }
+    }
+  } catch { /* bo qua cache hong */ }
+  if (os === 'ios' || os === 'android') {
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 5000);
+      const res = await fetch(`https://api.vietqr.io/v2/${os}-app-deeplinks`, { signal: ctl.signal });
+      clearTimeout(t);
+      if (res.ok) {
+        const json = await res.json();
+        const list = Array.isArray(json) ? json : (json.data || []);
+        const apps = list.map(normalizeListEntry).filter(Boolean);
+        if (apps.length > 0) {
+          try { window.localStorage.setItem(SENDER_LIST_CACHE_KEY, JSON.stringify({ os, apps, at: Date.now() })); } catch { /* bo qua */ }
+          return { apps, source: 'live' };
+        }
+      }
+    } catch { /* roi xuong danh sach co san */ }
+  }
+  return { apps: BUNDLED_SENDER_APPS.map(a => ({ ...a, bankName: '', appLogo: '' })), source: 'bundled' };
+}
 
 function byteLen(s) {
   return new TextEncoder().encode(s).length;
@@ -148,18 +255,19 @@ export function parseVietQR(payload) {
   return out;
 }
 
-// Link mo app ngan hang qua VietQR Deeplink.
+// Link mo app ngan hang CUA NGUOI CHUYEN qua VietQR Deeplink.
+// senderAppId: appId tu danh sach deeplink theo OS (VD: 'mb').
+// bankCode: ngan hang NGUOI NHAN (ma ngan hang, VD: 'MB', 'VCB').
 // LUU Y TRUNG THUC: VietQR cong bo danh sach app + cac truong du lieu duoc gui
 // (ma ngan hang, so TK, ten TK, so tien, noi dung), nhung ten tham so query
 // chinh xac cua dl.vietqr.io khong co trong tai lieu cong khai ma tac gia kiem
 // chung duoc. Link nay gui kem dung cac truong do theo quy uoc chung cua
 // VietQR; neu app ngan hang khong tu dien, nguoi dung quet ma QR ben duoi
 // (ma nay thi chac chan dung chuan) va KHONG duoc xac nhan khi thong tin sai.
-export function vietqrDeeplink({ bankCode, accountNumber, accountName, amount, memo }) {
-  const app = DEEPLINK_AUTOFILL[bankCode];
-  if (!app) return null;
+export function vietqrDeeplink({ senderAppId, bankCode, accountNumber, accountName, amount, memo }) {
+  if (!senderAppId) return null;
   const q = new URLSearchParams({
-    app: app.appId,
+    app: senderAppId,
     bank: bankCode,
     accountNumber: String(accountNumber).replace(/\D/g, ''),
     accountName: accountName || '',
