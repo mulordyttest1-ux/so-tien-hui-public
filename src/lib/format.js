@@ -42,6 +42,18 @@ export function sumByType(txs, type) {
   return txs.filter(t => t.type === type).reduce((s, t) => s + Number(t.amount), 0);
 }
 
+// Loai doi tac: "nguoi" la cach nguoi dung quan ly (ai nhan tien), khac voi
+// ten phap ly cua chu tai khoan tren bank_accounts.
+export const PERSON_KIND_LABELS = {
+  nguoi: 'Người', cong_ty: 'Công ty', shop: 'Shop', khac: 'Khác',
+};
+
+export function personDisplay(p) {
+  if (!p) return '';
+  const k = p.kind && p.kind !== 'nguoi' ? ` (${PERSON_KIND_LABELS[p.kind] || p.kind})` : '';
+  return `${p.name}${k}`;
+}
+
 /**
  * Tính toán 1 dây hụi (giai đoạn 1 — công thức chuẩn, ghi rõ để giai đoạn sau tinh chỉnh):
  * - Mỗi kỳ mình đóng: amount_per_period × my_shares
