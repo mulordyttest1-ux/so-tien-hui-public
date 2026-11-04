@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import AppShell from '../../components/AppShell';
+import MoneyInput from '../../components/MoneyInput';
 import { useRequireAuth } from '../../components/useRequireAuth';
 import { supabase } from '../../lib/supabaseClient';
 import { fetchHui, saveHuiRound, deleteHuiRound } from '../../lib/data';
@@ -24,6 +25,7 @@ export default function HuiPage() {
 
   async function saveGroup(e) {
     e.preventDefault();
+    if (!editingGroup.amount_per_period || Number(editingGroup.amount_per_period) < 1) { alert('Nhập tiền 1 chân / 1 kỳ lớn hơn 0.'); return; }
     const payload = {
       user_id: user.id, name: editingGroup.name,
       amount_per_period: Number(editingGroup.amount_per_period),
@@ -140,7 +142,7 @@ export default function HuiPage() {
               <label className="field"><span>Tên dây hụi</span>
                 <input required value={editingGroup.name} onChange={e => setEditingGroup({ ...editingGroup, name: e.target.value })} placeholder="VD: Hụi tháng 1 triệu" /></label>
               <label className="field"><span>Tiền 1 chân / 1 kỳ (đ)</span>
-                <input type="number" required min="1" value={editingGroup.amount_per_period} onChange={e => setEditingGroup({ ...editingGroup, amount_per_period: e.target.value })} placeholder="VD: 1000000" /></label>
+                <MoneyInput value={editingGroup.amount_per_period} onChange={v => setEditingGroup({ ...editingGroup, amount_per_period: v })} placeholder="VD: 1.000.000" /></label>
               <div className="grid2" style={{ gap: 8 }}>
                 <label className="field"><span>Tổng số chân</span>
                   <input type="number" required min="1" value={editingGroup.total_shares} onChange={e => setEditingGroup({ ...editingGroup, total_shares: e.target.value })} /></label>
@@ -149,7 +151,7 @@ export default function HuiPage() {
                 <label className="field"><span>Tổng số kỳ</span>
                   <input type="number" required min="1" value={editingGroup.total_periods} onChange={e => setEditingGroup({ ...editingGroup, total_periods: e.target.value })} /></label>
                 <label className="field"><span>Tiền thầu / lần hốt (đ)</span>
-                  <input type="number" min="0" value={editingGroup.fee} onChange={e => setEditingGroup({ ...editingGroup, fee: e.target.value })} /></label>
+                  <MoneyInput value={editingGroup.fee} onChange={v => setEditingGroup({ ...editingGroup, fee: v })} /></label>
               </div>
               <label className="field"><span>Ngày bắt đầu</span>
                 <input type="date" value={editingGroup.start_date || ''} onChange={e => setEditingGroup({ ...editingGroup, start_date: e.target.value })} /></label>
@@ -182,11 +184,11 @@ export default function HuiPage() {
                   onChange={e => setRoundFor({ ...roundFor, round: { ...roundFor.round, winner_name: e.target.value } })}
                   placeholder="Tên người hốt (để trống nếu chưa ai hốt)" /></label>
               <label className="field"><span>Mình đóng kỳ này (đ)</span>
-                <input type="number" min="0" value={roundFor.round.my_contribution}
-                  onChange={e => setRoundFor({ ...roundFor, round: { ...roundFor.round, my_contribution: e.target.value } })} /></label>
+                <MoneyInput value={roundFor.round.my_contribution}
+                  onChange={v => setRoundFor({ ...roundFor, round: { ...roundFor.round, my_contribution: v } })} /></label>
               <label className="field"><span>Mình hốt kỳ này (đ) — 0 nếu không phải mình</span>
-                <input type="number" min="0" value={roundFor.round.my_withdrawal}
-                  onChange={e => setRoundFor({ ...roundFor, round: { ...roundFor.round, my_withdrawal: e.target.value } })} /></label>
+                <MoneyInput value={roundFor.round.my_withdrawal}
+                  onChange={v => setRoundFor({ ...roundFor, round: { ...roundFor.round, my_withdrawal: v } })} /></label>
               <p className="muted">Khoản đóng / hốt sẽ tự ghi vào Sổ tiền.</p>
               <div className="modal-actions">
                 <button type="button" className="btn secondary" onClick={() => setRoundFor(null)}>Hủy</button>
