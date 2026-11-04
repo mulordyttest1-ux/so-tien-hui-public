@@ -1,5 +1,10 @@
 // Nghiep vu chuyen khoan - tuan thu ket luan kiem toan:
-// - Trang thai chi co: pending -> confirmed | pending -> voided (ly do). Khong xoa.
+// - Trang thai chi co: pending -> confirmed | pending -> voided (ly do).
+// - Xoa/sua: GIAI DOAN DEBUG mo thoai mai theo yeu cau cua Nancy
+//   (2026-11-04): xoa duoc ca lenh da xac nhan, sua duoc ca khoan gan
+//   lenh. Xoa lenh da xac nhan se go ca khoan so da chot va (neu co)
+//   reset tien dong cua ky hui ve 0, de so khong lech. Khi het debug
+//   co the siet lai thanh chi xoa lenh chua chuyen tien.
 // - Tien pending TACH RIENG khoi tien da chot trong moi tong so (xem isSettled).
 // - Mot ky hui chi co toi da 1 lenh pending (rang buoc DB + kiem tra o day).
 // - Tao / xac nhan / huy luon cap nhat dong bo: payment + transaction (+ ky hui
@@ -140,6 +145,35 @@ export async function voidPayment(payment, userId, reason) {
     await supabase.from('transactions').update({ status: 'voided' }).eq('id', fresh.transaction_id);
   }
   await logEvent(payment.id, userId, 'voided', 'pending', 'voided', reason || 'other');
+  return true;
+}
+
+// Xoa han lenh chuyen khoan + khoan so + audit events cua no.
+// GIAI DOAN DEBUG: mo thoai mai moi trang thai, ke ca da xac nhan.
+// Neu lenh da xac nhan va gan ky hui thi reset tien dong cua ky ve 0
+// (vi tien dong chi duoc ghi vao ky luc xac nhan lenh nay) de tong hui
+// khong lech sau khi xoa.
+export async function deletePayment(payment, userId) {
+  const { data: fresh, error: fErr } = await supabase.from('payments').select('*').eq('id', payment.id).single();
+  if (fErr) throw fErr;
+  if (fresh.user_id !== userId) throw new Error('Không phải lệnh của bạn.');
+  const wasConfirmed = fresh.status === 'confirmed';
+  // Thu tu: events -> transaction -> (dao nguoc ky hui neu can) -> payment.
+  // Events co FK cascade theo payment nhung xoa tuong minh de khong phu
+  // thuoc vao cascade + RLS (can migration_bank4 cho phep xoa events
+  // cua minh).
+  const { error: evErr } = await supabase.from('payment_events').delete().eq('payment_id', fresh.id);
+  if (evErr) throw evErr;
+  if (fresh.transaction_id) {
+    const { error: txErr } = await supabase.from('transactions').delete().eq('id', fresh.transaction_id);
+    if (txErr) throw txErr;
+  }
+  if (wasConfirmed && fresh.hui_round_id) {
+    const { error: huiErr } = await supabase.from('hui_rounds').update({ my_contribution: 0 }).eq('id', fresh.hui_round_id);
+    if (huiErr) throw huiErr;
+  }
+  const { error } = await supabase.from('payments').delete().eq('id', fresh.id);
+  if (error) throw error;
   return true;
 }
 
