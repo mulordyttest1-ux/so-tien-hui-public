@@ -4,6 +4,7 @@ import AppShell from '../../components/AppShell';
 import { useRequireAuth } from '../../components/useRequireAuth';
 import { CALC_TEMPLATES } from '../../lib/calcTemplates';
 import { solveValues } from '../../lib/solver';
+import MoneyInput from '../../components/MoneyInput';
 
 const DAY_MS = 86400000;
 
@@ -99,14 +100,23 @@ export default function TinhNhanhPage() {
           {derived && <span className="chip">tự tính</span>}
           {isDefault && <span className="muted" style={{ marginLeft: 6 }}>mặc định</span>}
         </span>
-        <input
-          type={f.kind === 'date' ? 'date' : 'text'}
-          inputMode={f.kind === 'date' ? undefined : 'decimal'}
-          value={value}
-          placeholder={f.placeholder || 'Chưa có dữ kiện'}
-          onChange={e => setRaw(prev => ({ ...prev, [f.key]: e.target.value }))}
-          className={derived ? 'derived' : ''}
-        />
+        {f.kind === 'money' ? (
+          <MoneyInput
+            value={value}
+            placeholder={f.placeholder || 'Chưa có dữ kiện'}
+            onChange={v => setRaw(prev => ({ ...prev, [f.key]: v }))}
+            className={derived ? 'derived' : ''}
+          />
+        ) : (
+          <input
+            type={f.kind === 'date' ? 'date' : 'text'}
+            inputMode={f.kind === 'date' ? undefined : 'decimal'}
+            value={value}
+            placeholder={f.placeholder || 'Chưa có dữ kiện'}
+            onChange={e => setRaw(prev => ({ ...prev, [f.key]: e.target.value }))}
+            className={derived ? 'derived' : ''}
+          />
+        )}
       </label>
     );
   }
