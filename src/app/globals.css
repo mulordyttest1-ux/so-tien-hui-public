@@ -35,6 +35,13 @@ input.derived { background:#f0f7f0; }
 .badge-pending-old { background:#ffedd5; color:#9a3412; border:2px solid #c2410c; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; white-space:nowrap; }
 .badge-ok { background:#dcfce7; color:#166534; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; white-space:nowrap; }
 .badge-void { background:#fee2e2; color:#991b1b; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; white-space:nowrap; }
+.qr-reader { width:100%; max-width:420px; margin:0 auto; }
+.qr-reader video { width:100% !important; border-radius:12px; }
+/* Nut quet QR noi bat, nam tren thanh dieu huong, hien tren moi man hinh */
+.qr-fab { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom) + 78px); width:60px; height:60px; border-radius:50%; border:3px solid #fff; background:var(--green); color:#fff; font-size:26px; line-height:1; box-shadow:0 4px 14px rgba(0,0,0,.3); z-index:90; display:flex; align-items:center; justify-content:center; }
+.qr-fab:active { background:var(--green-dark); }
+.qr-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; overflow-y:auto; padding:24px 16px; display:flex; align-items:flex-start; justify-content:center; }
+.qr-overlay .card { width:100%; max-width:480px; }
 .card h3 { margin:0 0 8px; font-size:15px; }
 .big { font-size:26px; font-weight:800; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -64,6 +71,7 @@ input.derived { background:#f0f7f0; }
 .filters .search { grid-column: span 2; }
 
 .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:20; display:flex; align-items:flex-end; justify-content:center; }
+.modal-bg.modal-top { z-index:30; }
 .modal { background:#fff; width:100%; max-width:560px; max-height:92dvh; overflow:auto; border-radius:18px 18px 0 0; padding:20px 16px calc(20px + env(safe-area-inset-bottom)); }
 .modal h2 { margin:0 0 14px; font-size:18px; }
 .modal-actions { display:flex; gap:8px; margin-top:6px; }
