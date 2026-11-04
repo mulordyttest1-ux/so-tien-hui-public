@@ -7,7 +7,7 @@ import TagSelect from '../../components/TagSelect';
 import MoneyInput from '../../components/MoneyInput';
 import { supabase } from '../../lib/supabaseClient';
 import { fetchTransactions, fetchTags } from '../../lib/data';
-import { fetchBankAccounts, createPayment, findSimilarPayments, isSettled, isPendingTx } from '../../lib/payments';
+import { fetchBankAccounts, createPayment, findSimilarPayments, isSettled, isPendingTx, deletePayment } from '../../lib/payments';
 import { cleanMemo } from '../../lib/vietqr';
 import { fmtVND, todayISO } from '../../lib/format';
 
@@ -57,16 +57,18 @@ export default function SoTienPage() {
   async function save(e) {
     e.preventDefault();
     if (!editing.amount || Number(editing.amount) < 1) { alert('Nhập số tiền lớn hơn 0.'); return; }
-    // Khoan gan lenh CK: chi duoc bo sung truong mo ta (nguoi/hang muc/nguon/ghi chu).
-    // So tien / ngay / loai khoa theo lenh chuyen that, sua la so lech voi ngan hang.
+    // Khoan gan lenh CK (giai doan debug: sua thoai mai): sua het cac
+    // truong, roi dong bo so tien sang lenh CK cho khoi lech nhau.
     if (editing.id && editing.payment_id) {
       const payload = {
+        type: editing.type, amount: Number(editing.amount), date: editing.date,
         person_id: editing.person_id || null, category_id: editing.category_id || null,
         source_id: editing.source_id || null, note: editing.note || '',
       };
       try {
         const { data, error } = await supabase.from('transactions').update(payload).eq('id', editing.id).select().single();
         if (error) throw error;
+        await supabase.from('payments').update({ amount: Number(editing.amount) }).eq('id', editing.payment_id);
         setTxs(prev => [data, ...prev.filter(t => t.id !== data.id)]);
         setEditing(null); await load();
       } catch (err) { alert('Không lưu được: ' + err.message); }
@@ -106,9 +108,26 @@ export default function SoTienPage() {
   }
 
   async function remove(tx) {
-    // Khoan gan lenh chuyen khoan khong duoc sua/xoa rieng le (kiem toan):
-    // phai chot/huy lenh o tab Ngan hang, so moi khong lech.
-    if (tx.payment_id) { alert('Khoản này gắn với lệnh chuyển khoản — hãy chốt hoặc hủy lệnh ở tab Ngân hàng, không xóa riêng ở đây.'); return; }
+    // Khoan gan lenh chuyen khoan (giai doan debug: xoa thoai mai):
+    // xoa han ca lenh + khoan so. Lenh da xac nhan ma gan ky hui thi
+    // deletePayment reset tien dong cua ky ve 0 de tong hui khong lech.
+    if (tx.payment_id) {
+      try {
+        const { data: pay } = await supabase.from('payments').select('*').eq('id', tx.payment_id).single();
+        if (!pay) {
+          // Lenh da mat truoc do, chi con khoan mo coi: xoa khoan.
+          const { error } = await supabase.from('transactions').delete().eq('id', tx.id);
+          if (error) alert(error.message); else load();
+          return;
+        }
+        if (!confirm(pay.status === 'confirmed'
+          ? 'Khoản này đã chuyển thành công — xóa sẽ gỡ cả lệnh và khoản sổ đã chốt (và tiền đóng hụi của kỳ này nếu có). Vẫn xóa?'
+          : 'Xóa hẳn lệnh và khoản sổ này?')) return;
+        await deletePayment(pay, user.id);
+        load();
+      } catch (e) { alert(e.message); }
+      return;
+    }
     if (!confirm('Xóa khoản này?')) return;
     const { error } = await supabase.from('transactions').delete().eq('id', tx.id);
     if (error) alert(error.message); else load();
@@ -232,23 +251,21 @@ export default function SoTienPage() {
             <h2>{editing.id ? 'Sửa khoản' : 'Ghi khoản mới'}</h2>
             {editing.payment_id && (
               <p className="muted">
-                Khoản này gắn với lệnh chuyển khoản — chỉ bổ sung được người / hạng mục / nguồn / ghi chú.
-                Số tiền, ngày và loại thu/chi đã khóa theo lệnh chuyển thật.
+                Khoản này gắn với lệnh chuyển khoản — đang ở giai đoạn debug nên sửa thoải mái:
+                sửa số tiền ở đây sẽ đồng bộ sang lệnh chuyển khoản luôn.
               </p>
             )}
             <form onSubmit={save}>
               <div className="seg">
-                <button type="button" disabled={!!editing.payment_id} className={editing.type === 'thu' ? 'on-thu' : ''} onClick={() => setEditing({ ...editing, type: 'thu' })}>Thu vào</button>
-                <button type="button" disabled={!!editing.payment_id} className={editing.type === 'chi' ? 'on-chi' : ''} onClick={() => setEditing({ ...editing, type: 'chi' })}>Chi ra</button>
+                <button type="button" className={editing.type === 'thu' ? 'on-thu' : ''} onClick={() => setEditing({ ...editing, type: 'thu' })}>Thu vào</button>
+                <button type="button" className={editing.type === 'chi' ? 'on-chi' : ''} onClick={() => setEditing({ ...editing, type: 'chi' })}>Chi ra</button>
               </div>
               <label className="field"><span>Số tiền (đ)</span>
-                {editing.payment_id
-                  ? <div><b>{fmtVND(editing.amount)}</b> <span className="muted">(đã khóa theo lệnh CK)</span></div>
-                  : <MoneyInput value={editing.amount}
-                    onChange={v => setEditing({ ...editing, amount: v })} placeholder="VD: 500.000" />}
+                <MoneyInput value={editing.amount}
+                  onChange={v => setEditing({ ...editing, amount: v })} placeholder="VD: 500.000" />
               </label>
               <label className="field"><span>Ngày</span>
-                <input type="date" required disabled={!!editing.payment_id} value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} />
+                <input type="date" required value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} />
               </label>
               <TagSelect label="Người" table="persons" items={tags.persons} userId={user.id}
                 value={editing.person_id} onChange={v => setEditing({ ...editing, person_id: v })} onCreated={addTagTo('persons')} />
