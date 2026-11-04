@@ -1,25 +1,36 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AppShell from '../../components/AppShell';
 import MoneyInput from '../../components/MoneyInput';
 import { useRequireAuth } from '../../components/useRequireAuth';
 import { supabase } from '../../lib/supabaseClient';
-import { fetchHui, saveHuiRound, deleteHuiRound } from '../../lib/data';
+import { fetchHui, saveHuiRound, deleteHuiRound, fetchTags } from '../../lib/data';
+import { fetchBankAccounts, fetchPayments, createPayment, findSimilarPayments } from '../../lib/payments';
+import { cleanMemo } from '../../lib/vietqr';
 import { fmtVND, todayISO, calcHuiGroup } from '../../lib/format';
 
 const EMPTY_GROUP = { name: '', amount_per_period: '', total_shares: '', my_shares: 1, total_periods: '', fee: 0, start_date: todayISO(), note: '' };
 
 export default function HuiPage() {
   const { user, loading } = useRequireAuth();
+  const router = useRouter();
   const [groups, setGroups] = useState([]);
   const [rounds, setRounds] = useState([]);
   const [ready, setReady] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [roundFor, setRoundFor] = useState(null); // {group, round}
+  const [bankFor, setBankFor] = useState(null); // {group, round}
+  const [payments, setPayments] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [persons, setPersons] = useState([]);
+  const [bankPersonId, setBankPersonId] = useState('');
+  const [bankAccountId, setBankAccountId] = useState('');
+  const [bankBusy, setBankBusy] = useState(false);
 
   async function load() {
-    const h = await fetchHui();
-    setGroups(h.groups); setRounds(h.rounds); setReady(true);
+    const [h, pay, acc, tg] = await Promise.all([fetchHui(), fetchPayments(), fetchBankAccounts(), fetchTags()]);
+    setGroups(h.groups); setRounds(h.rounds); setPayments(pay); setAccounts(acc); setPersons(tg.persons); setReady(true);
   }
   useEffect(() => { if (user) load().catch(e => alert(e.message)); }, [user]);
 
@@ -80,6 +91,26 @@ export default function HuiPage() {
     } catch (err) { alert('Không lưu được kỳ hụi: ' + err.message); }
   }
 
+  async function createHuiBankPayment() {
+    const { group, round } = bankFor;
+    const amount = Number(group.amount_per_period) * Number(group.my_shares || 1);
+    if (!bankPersonId) { alert('Chọn người nhận tiền.'); return; }
+    if (!bankAccountId) { alert('Chọn tài khoản ngân hàng nhận tiền.'); return; }
+    const similar = await findSimilarPayments(bankPersonId, amount).catch(() => []);
+    if (similar.length > 0 && !confirm(`Đã có ${similar.length} lệnh gần đây cho người này với đúng số tiền này trong 24h qua. Có thể bạn bấm trùng — vẫn tạo lệnh mới?`)) return;
+    setBankBusy(true);
+    try {
+      const pay = await createPayment({
+        userId: user.id, personId: bankPersonId, bankAccountId,
+        amount, memo: cleanMemo(`Dong hui ${group.name} ky ${round.period_no}`),
+        date: round.date, note: `Đóng hụi ${group.name} — kỳ ${round.period_no} (qua ngân hàng)`,
+        huiGroupId: group.id, huiRoundId: round.id, launchMethod: 'qr',
+      });
+      setBankFor(null); setBankBusy(false);
+      router.push(`/chuyen-khoan/${pay.id}`);
+    } catch (err) { alert('Không tạo được lệnh: ' + err.message); setBankBusy(false); }
+  }
+
   if (loading || !user) return <div className="loading">Đang tải…</div>;
 
   return (
@@ -97,6 +128,12 @@ export default function HuiPage() {
               </div>
               <div style={{ marginTop: 8, lineHeight: 1.7 }}>
                 <div>Đã đóng: <b>{fmtVND(c.daDong)}</b> ({c.roundsDone}/{g.total_periods} kỳ)</div>
+                {(() => {
+                  const pend = payments.filter(p => p.hui_group_id === g.id && p.status === 'pending');
+                  return pend.length > 0 ? (
+                    <div>Chờ xác nhận qua ngân hàng: <b>{fmtVND(pend.reduce((s, p) => s + Number(p.amount), 0))}</b> ({pend.length} lệnh, chưa tính vào “Đã đóng”)</div>
+                  ) : null;
+                })()}
                 <div>Đã hốt: <b>{fmtVND(c.daHot)}</b>{c.daHotRoi ? '' : ` — nếu hốt sẽ được khoảng ${fmtVND(c.estimatedHaulPerTime)}/lần`}</div>
                 {c.daHotRoi && <div>Còn phải đóng (hụi chết): <b>{fmtVND(c.conPhaiDongHuiChet)}</b></div>}
                 <div>Chốt dây dự kiến: <span className={c.loiLoDuKien >= 0 ? 'thu' : 'chi'}>
@@ -104,21 +141,36 @@ export default function HuiPage() {
                 </div>
               </div>
 
-              {gr.map(r => (
+              {gr.map(r => {
+                const pendPay = payments.find(p => p.hui_round_id === r.id && p.status === 'pending');
+                return (
                 <div className="row" key={r.id}>
-                  <span>Kỳ {r.period_no} · {r.date}<br />
+                  <span>Kỳ {r.period_no} · {r.date}
+                    {pendPay && <span className="badge-pending" style={{ marginLeft: 6 }}>Chờ xác nhận NH</span>}
+                    <br />
                     <span className="muted">
                       {r.winner_name ? `Người hốt: ${r.winner_name}` : ''}
                       {Number(r.my_contribution) > 0 ? ` · Mình đóng ${fmtVND(r.my_contribution)}` : ''}
                       {Number(r.my_withdrawal) > 0 ? ` · Mình hốt ${fmtVND(r.my_withdrawal)}` : ''}
                     </span>
                   </span>
-                  <span style={{ display: 'flex', gap: 6 }}>
+                  <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button className="btn secondary small" onClick={() => setRoundFor({ group: g, round: { ...r } })}>Sửa</button>
-                    <button className="btn danger small" onClick={async () => { if (confirm('Xóa kỳ này? Giao dịch gương trong sổ cũng bị xóa.')) { await deleteHuiRound(r.id); load(); } }}>Xóa</button>
+                    <button className="btn danger small" onClick={async () => {
+                      if (payments.some(p => p.hui_round_id === r.id && p.status === 'pending')) { alert('Kỳ này đang có lệnh chuyển khoản chờ xác nhận — hãy chốt hoặc hủy lệnh ở tab Ngân hàng trước khi xóa kỳ.'); return; }
+                      if (confirm('Xóa kỳ này? Giao dịch gương trong sổ cũng bị xóa.')) { await deleteHuiRound(r.id); load(); }
+                    }}>Xóa</button>
+                    {pendPay
+                      ? <a className="btn secondary small" href={`/chuyen-khoan/${pendPay.id}`}>Mở lệnh CK</a>
+                      : Number(r.my_contribution) === 0 && (
+                        <button className="btn small" onClick={() => { setBankFor({ group: g, round: r }); setBankPersonId(''); setBankAccountId(''); }}>
+                          Đóng qua NH
+                        </button>
+                      )}
                   </span>
                 </div>
-              ))}
+                );
+              })}
 
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <button className="btn small" onClick={() => setRoundFor({
@@ -165,6 +217,48 @@ export default function HuiPage() {
           </div>
         </div>
       )}
+
+      {bankFor && (() => {
+        const amount = Number(bankFor.group.amount_per_period) * Number(bankFor.group.my_shares || 1);
+        const acc = accounts.find(a => a.id === bankAccountId);
+        return (
+          <div className="modal-bg" onClick={() => setBankFor(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <h2>Đóng hụi qua ngân hàng — {bankFor.group.name} kỳ {bankFor.round.period_no}</h2>
+              <p className="muted" style={{ lineHeight: 1.8 }}>
+                Số tiền kỳ này: <b>{fmtVND(amount)}</b><br />
+                Nội dung chuyển khoản: <b>{cleanMemo(`Dong hui ${bankFor.group.name} ky ${bankFor.round.period_no}`)}</b>
+              </p>
+              <label className="field"><span>Chuyển cho người (ví dụ: chị C)</span>
+                <select value={bankPersonId} onChange={e => { setBankPersonId(e.target.value); setBankAccountId(''); }}>
+                  <option value="">— Chọn người —</option>
+                  {persons.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+              <label className="field"><span>Tài khoản nhận tiền</span>
+                <select value={bankAccountId} onChange={e => setBankAccountId(e.target.value)}>
+                  <option value="">— Chọn tài khoản —</option>
+                  {accounts.filter(a => !bankPersonId || a.person_id === bankPersonId).map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.bank_name} · {a.account_number}{a.holder_name ? ` (${a.holder_name})` : ''}{a.note ? ` — ${a.note}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <span className="muted">Chưa có tài khoản thì vào tab Ngân hàng để thêm (quét QR hoặc nhập tay).</span>
+              </label>
+              <p className="muted">
+                Bấm “Tạo lệnh” là kỳ này được ghi với tiền đóng = 0 và lệnh chuyển khoản ở trạng thái
+                <b> Chờ xác nhận</b>. Khi bạn xác nhận đã chuyển, tiền đóng mới ghi vào kỳ này.
+                Hủy lệnh thì kỳ vẫn ở 0, không mất gì.
+              </p>
+              <div className="modal-actions">
+                <button type="button" className="btn secondary" onClick={() => setBankFor(null)}>Hủy</button>
+                <button type="button" className="btn" disabled={bankBusy} onClick={createHuiBankPayment}>Tạo lệnh &amp; mở app ngân hàng</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {roundFor && (
         <div className="modal-bg" onClick={() => setRoundFor(null)}>
