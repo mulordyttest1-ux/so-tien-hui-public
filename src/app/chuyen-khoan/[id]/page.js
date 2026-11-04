@@ -10,7 +10,8 @@ import { useRequireAuth } from '../../../components/useRequireAuth';
 import { supabase } from '../../../lib/supabaseClient';
 import { fetchTags } from '../../../lib/data';
 import { confirmPayment, voidPayment, VOID_REASONS } from '../../../lib/payments';
-import { buildVietQR, vietqrDeeplink, DEEPLINK_AUTOFILL, bankByCode } from '../../../lib/vietqr';
+import { buildVietQR, vietqrDeeplink, getSenderBankApp, saveSenderBankApp, fetchSenderAppList, isPhoneOS } from '../../../lib/vietqr';
+import SenderBankChooser from '../../../components/SenderBankChooser';
 import { fmtVND } from '../../../lib/format';
 
 export default function ChuyenKhoanPage() {
@@ -26,6 +27,11 @@ export default function ChuyenKhoanPage() {
   const [voidReason, setVoidReason] = useState('abandoned');
   const [showVoid, setShowVoid] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  // App ngan hang cua NGUOI CHUYEN (ban), luu tren may nay. Khac voi
+  // ngan hang nguoi nhan o tai khoan ben tren.
+  const [senderApp, setSenderApp] = useState(null);
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [phone, setPhone] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -53,15 +59,33 @@ export default function ChuyenKhoanPage() {
     } catch (e) { setQrError(e.message); }
   }, [pay, account]);
 
+  // Nap app nguoi chuyen da luu; neu app do khong con trong danh sach
+  // moi cua VietQR (doi OS hoac doi danh sach) thi quay ve bang chon.
+  // Chi xoa khi danh sach lay duoc la danh sach that (live/cache) — danh
+  // sach du phong thieu app khong co nghia la app da mat.
+  useEffect(() => {
+    setPhone(isPhoneOS());
+    const saved = getSenderBankApp();
+    setSenderApp(saved);
+    if (!saved) return;
+    fetchSenderAppList().then(({ apps, source }) => {
+      if ((source === 'live' || source === 'cache') && !apps.some(a => a.appId === saved.appId)) {
+        setSenderApp(null);
+      }
+    }).catch(() => {});
+  }, []);
+
   if (loading || !user) return <div className="loading">Đang tải…</div>;
   if (!pay) return <div className="loading">Đang tải lệnh…</div>;
 
   const personName = persons.find(p => p.id === pay.person_id)?.name || '';
-  const deeplink = account ? vietqrDeeplink({
+  // Deeplink dung app cua NGUOI CHUYEN (senderApp) + ngan hang NGUOI NHAN
+  // (account.bank_code). Hai phia nay doc lap nhau.
+  const deeplink = (account && senderApp) ? vietqrDeeplink({
+    senderAppId: senderApp.appId,
     bankCode: account.bank_code, accountNumber: account.account_number,
     accountName: account.holder_name, amount: pay.amount, memo: pay.memo,
   }) : null;
-  const dlApp = account ? DEEPLINK_AUTOFILL[account.bank_code] : null;
 
   async function doConfirm() {
     setBusy(true);
@@ -101,23 +125,46 @@ export default function ChuyenKhoanPage() {
               ? <img src={qrUrl} alt="Mã QR VietQR" style={{ width: 260, height: 260 }} />
               : <div className="muted">{qrError || 'Đang tạo mã…'}</div>}
             <p className="muted">Quét mã này là app ngân hàng tự điền đúng số tiền, số TK, nội dung.</p>
-            {deeplink && dlApp && (
+            {senderApp && deeplink && (
               <div>
                 <a className="btn" href={deeplink} target="_blank" rel="noreferrer">
-                  Mở {dlApp.appName} (thử tự điền)
+                  Mở {senderApp.appName}
                 </a>
+                {senderApp.autofill ? (
+                  <p className="muted" style={{ marginTop: 8 }}>
+                    <b>Tự động điền:</b> app mở ra với số tiền, số TK, nội dung điền sẵn.
+                    Nếu mở ra mà KHÔNG điền đúng thì đừng xác nhận — hãy quay lại quét mã QR ở trên.
+                  </p>
+                ) : (
+                  <p className="muted" style={{ marginTop: 8 }}>
+                    App này mở ra nhưng <b>không tự điền</b> — bạn nhập số tiền và nội dung
+                    theo thông tin bên dưới, hoặc quét mã QR ở trên cho chắc.
+                  </p>
+                )}
+                {!phone && (
+                  <p className="muted" style={{ marginTop: 8 }}>
+                    Trên máy tính, link này mở trang trung gian của VietQR kèm mã QR —
+                    app ngân hàng chỉ mở thẳng trên điện thoại.
+                  </p>
+                )}
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn secondary small" onClick={() => setChooserOpen(true)}>Đổi ngân hàng</button>
+                </div>
+              </div>
+            )}
+            {!senderApp && (
+              <div>
+                <button className="btn" onClick={() => setChooserOpen(true)}>Chọn app ngân hàng của bạn</button>
                 <p className="muted" style={{ marginTop: 8 }}>
-                  Nếu app ngân hàng mở ra mà KHÔNG tự điền đúng số tiền / số TK / nội dung thì
-                  đừng xác nhận — hãy quay lại quét mã QR ở trên.
+                  Chọn app bạn dùng để chuyển tiền — chọn một lần, app sẽ nhớ trên máy này.
+                  Chưa chọn thì mã QR ở trên vẫn chuyển được bình thường.
                 </p>
               </div>
             )}
-            {!deeplink && (
-              <p className="muted">
-                Ngân hàng này chưa hỗ trợ mở app tự điền — hãy mở app ngân hàng của bạn rồi quét mã QR ở trên.
-              </p>
-            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+              {qrUrl && (
+                <a className="btn secondary small" href={qrUrl} download="vietqr.png">Lưu ảnh QR</a>
+              )}
               <button className="btn secondary small" onClick={() => {
                 const text = `NH: ${account?.bank_name} | STK: ${account?.account_number} | Tien: ${pay.amount} | ND: ${pay.memo}`;
                 navigator.clipboard?.writeText(text).then(() => alert('Đã sao chép thông tin chuyển khoản.'));
@@ -158,6 +205,13 @@ export default function ChuyenKhoanPage() {
           </div>
         </>
       )}
+
+      <SenderBankChooser
+        open={chooserOpen}
+        currentAppId={senderApp?.appId}
+        onClose={() => setChooserOpen(false)}
+        onSelect={(app) => { saveSenderBankApp(app); setSenderApp(app); setChooserOpen(false); }}
+      />
 
       {pay.status !== 'pending' && (
         <div className="card">
