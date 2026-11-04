@@ -25,6 +25,7 @@ export default function ChuyenKhoanPage() {
   const [busy, setBusy] = useState(false);
   const [voidReason, setVoidReason] = useState('abandoned');
   const [showVoid, setShowVoid] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -63,7 +64,6 @@ export default function ChuyenKhoanPage() {
   const dlApp = account ? DEEPLINK_AUTOFILL[account.bank_code] : null;
 
   async function doConfirm() {
-    if (!confirm('Bạn đã chuyển khoản này bên app ngân hàng rồi, đúng không? Chỉ bấm khi tiền thật sự đã đi.')) return;
     setBusy(true);
     try { await confirmPayment(pay, user.id); router.replace('/ngan-hang'); }
     catch (e) { alert(e.message); setBusy(false); }
@@ -126,15 +126,27 @@ export default function ChuyenKhoanPage() {
           </div>
 
           <div className="card" style={{ border: '2px solid #d97706', background: '#fffbeb' }}>
+            <p className="muted">
+              Muốn bổ sung thông tin cho khoản này (hạng mục, ghi chú như “mua bao gạo”) thì vào
+              Sổ tiền sửa khoản tương ứng — chỉ sửa được hạng mục / ghi chú / người, số tiền và ngày
+              đã khóa theo lệnh chuyển thật.
+            </p>
             <b>App này không tự biết ngân hàng đã chuyển xong hay chưa.</b>
             <div className="muted">
               Sau khi chuyển xong bên app ngân hàng, quay lại đây bấm “Đã chuyển”. Nếu chuyển thất bại
               hoặc không chuyển nữa, bấm “Hủy lệnh” và chọn lý do — lệnh sẽ được giữ lại làm bằng chứng, không bị xóa.
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <button className="btn" disabled={busy} onClick={doConfirm}>Tôi đã chuyển xong — Xác nhận</button>
+              <button className="btn" disabled={busy} onClick={() => setShowConfirm(!showConfirm)}>Tôi đã chuyển xong — Xác nhận</button>
               <button className="btn secondary" disabled={busy} onClick={() => setShowVoid(!showVoid)}>Hủy lệnh</button>
             </div>
+            {showConfirm && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span className="muted">Tiền thật sự đã đi bên app ngân hàng rồi?</span>
+                <button className="btn" disabled={busy} onClick={doConfirm}>Đúng, đã chuyển</button>
+                <button className="btn secondary" onClick={() => setShowConfirm(false)}>Chưa, để sau</button>
+              </div>
+            )}
             {showVoid && (
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <select value={voidReason} onChange={e => setVoidReason(e.target.value)}>
