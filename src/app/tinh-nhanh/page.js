@@ -78,6 +78,20 @@ export default function TinhNhanhPage() {
   }
 
   function renderField(f) {
+    if (f.kind === 'bool') {
+      const checked = raw[f.key] !== undefined ? raw[f.key] === '1' : (solved[f.key] === 1);
+      return (
+        <label className="field" key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="checkbox"
+            style={{ width: 'auto', accentColor: '#168250' }}
+            checked={checked}
+            onChange={e => setRaw(prev => ({ ...prev, [f.key]: e.target.checked ? '1' : '0' }))}
+          />
+          <span style={{ fontSize: 14 }}>{f.label} <span className="muted">(bật: đến − từ + 1 ngày; tắt: chỉ tính hiệu số)</span></span>
+        </label>
+      );
+    }
     const { derived, isDefault, value } = fieldView(f);
     return (
       <label className="field" key={f.key}>
