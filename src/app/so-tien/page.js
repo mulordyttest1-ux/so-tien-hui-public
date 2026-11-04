@@ -1,21 +1,30 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AppShell from '../../components/AppShell';
 import { useRequireAuth } from '../../components/useRequireAuth';
 import TagSelect from '../../components/TagSelect';
 import MoneyInput from '../../components/MoneyInput';
 import { supabase } from '../../lib/supabaseClient';
 import { fetchTransactions, fetchTags } from '../../lib/data';
+import { fetchBankAccounts, createPayment, findSimilarPayments, isSettled, isPendingTx } from '../../lib/payments';
+import { cleanMemo } from '../../lib/vietqr';
 import { fmtVND, todayISO } from '../../lib/format';
 
 const EMPTY = { type: 'chi', amount: '', date: todayISO(), person_id: null, category_id: null, source_id: null, note: '' };
 
 export default function SoTienPage() {
   const { user, loading } = useRequireAuth();
+  const router = useRouter();
   const [txs, setTxs] = useState([]);
   const [tags, setTags] = useState({ persons: [], categories: [], sources: [] });
+  const [accounts, setAccounts] = useState([]);
   const [ready, setReady] = useState(false);
   const [editing, setEditing] = useState(null); // null | tx object (id rỗng = mới)
+  const [payMode, setPayMode] = useState(false);
+  const [payAccountId, setPayAccountId] = useState('');
+  const [showReview, setShowReview] = useState(false);
+  const [payBusy, setPayBusy] = useState(false);
   const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [fType, setFType] = useState('');
   const [fPerson, setFPerson] = useState('');
@@ -23,8 +32,8 @@ export default function SoTienPage() {
   const [search, setSearch] = useState('');
 
   async function load() {
-    const [t, tg] = await Promise.all([fetchTransactions(), fetchTags()]);
-    setTxs(t); setTags(tg); setReady(true);
+    const [t, tg, acc] = await Promise.all([fetchTransactions(), fetchTags(), fetchBankAccounts()]);
+    setTxs(t); setTags(tg); setAccounts(acc); setReady(true);
   }
   useEffect(() => { if (user) load().catch(e => alert(e.message)); }, [user]);
 
@@ -36,13 +45,27 @@ export default function SoTienPage() {
     (!search || (t.note || '').toLowerCase().includes(search.toLowerCase()))
   ), [txs, month, fType, fPerson, fCat, search]);
 
-  const totalThu = filtered.filter(t => t.type === 'thu').reduce((s, t) => s + Number(t.amount), 0);
-  const totalChi = filtered.filter(t => t.type === 'chi').reduce((s, t) => s + Number(t.amount), 0);
+  // Chi tinh tien DA CHOT vao tong chinh; tien cho xac nhan / da huy tach rieng.
+  const settled = filtered.filter(isSettled);
+  const pending = filtered.filter(isPendingTx);
+  const totalThu = settled.filter(t => t.type === 'thu').reduce((s, t) => s + Number(t.amount), 0);
+  const totalChi = settled.filter(t => t.type === 'chi').reduce((s, t) => s + Number(t.amount), 0);
+  const pendingChi = pending.filter(t => t.type === 'chi').reduce((s, t) => s + Number(t.amount), 0);
+  const pendingThu = pending.filter(t => t.type === 'thu').reduce((s, t) => s + Number(t.amount), 0);
   const name = (list, id) => list.find(x => x.id === id)?.name || '';
 
   async function save(e) {
     e.preventDefault();
     if (!editing.amount || Number(editing.amount) < 1) { alert('Nhập số tiền lớn hơn 0.'); return; }
+    // Khoan chi moi + che do chuyen khoan: khong luu thang ma qua man hinh xem lai.
+    if (payMode && !editing.id && editing.type === 'chi') {
+      if (!payAccountId) { alert('Chọn tài khoản ngân hàng nhận tiền.'); return; }
+      if (!editing.person_id) { alert('Chọn người nhận tiền (trường Người).'); return; }
+      const similar = await findSimilarPayments(editing.person_id, Number(editing.amount)).catch(() => []);
+      if (similar.length > 0 && !confirm(`Đã có ${similar.length} lệnh gần đây cho người này với đúng số tiền này trong 24h qua. Có thể bạn bấm trùng — vẫn tạo lệnh mới?`)) return;
+      setShowReview(true);
+      return;
+    }
     const payload = {
       user_id: user.id, type: editing.type, amount: Number(editing.amount),
       date: editing.date, person_id: editing.person_id || null,
@@ -68,9 +91,28 @@ export default function SoTienPage() {
   }
 
   async function remove(tx) {
+    // Khoan gan lenh chuyen khoan khong duoc sua/xoa rieng le (kiem toan):
+    // phai chot/huy lenh o tab Ngan hang, so moi khong lech.
+    if (tx.payment_id) { alert('Khoản này gắn với lệnh chuyển khoản — hãy chốt hoặc hủy lệnh ở tab Ngân hàng, không xóa riêng ở đây.'); return; }
     if (!confirm('Xóa khoản này?')) return;
     const { error } = await supabase.from('transactions').delete().eq('id', tx.id);
     if (error) alert(error.message); else load();
+  }
+
+  async function createBankPayment() {
+    setPayBusy(true);
+    try {
+      const memo = cleanMemo(editing.note) || 'Chuyen khoan';
+      const pay = await createPayment({
+        userId: user.id, personId: editing.person_id, bankAccountId: payAccountId,
+        amount: Number(editing.amount), memo, date: editing.date,
+        categoryId: editing.category_id, sourceId: editing.source_id,
+        note: editing.note || '', launchMethod: 'qr',
+      });
+      setShowReview(false); setEditing(null); setPayMode(false);
+      router.push(`/chuyen-khoan/${pay.id}`);
+    } catch (err) { alert('Không tạo được lệnh: ' + err.message); }
+    finally { setPayBusy(false); }
   }
 
   function addTagTo(listKey) {
@@ -98,11 +140,16 @@ export default function SoTienPage() {
       </div>
 
       <div className="card">
-        <div style={{ display: 'flex', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <span className="thu">Thu {fmtVND(totalThu)}</span>
           <span className="chi">Chi {fmtVND(totalChi)}</span>
           <span><b>Còn {fmtVND(totalThu - totalChi)}</b></span>
         </div>
+        {(pendingThu > 0 || pendingChi > 0) && (
+          <div className="muted" style={{ marginTop: 4 }}>
+            Chờ xác nhận (chưa tính vào số trên): thu {fmtVND(pendingThu)} · chi {fmtVND(pendingChi)} — xem ở tab Ngân hàng.
+          </div>
+        )}
       </div>
 
       {!ready ? <div className="loading">Đang tải sổ…</div>
@@ -112,6 +159,8 @@ export default function SoTienPage() {
             <div className="row" style={{ border: 'none', padding: 0 }}>
               <span>
                 {t.note || name(tags.categories, t.category_id) || (t.type === 'thu' ? 'Khoản thu' : 'Khoản chi')}
+                {t.status === 'pending' && <span className="badge-pending" style={{ marginLeft: 6 }}>Chờ xác nhận</span>}
+                {t.status === 'voided' && <span className="badge-void" style={{ marginLeft: 6 }}>Đã hủy</span>}
                 <br /><span className="muted">
                   {t.date}
                   {name(tags.persons, t.person_id) && ' · ' + name(tags.persons, t.person_id)}
@@ -123,13 +172,45 @@ export default function SoTienPage() {
               <span className={t.type === 'thu' ? 'thu' : 'chi'}>{t.type === 'thu' ? '+' : '−'} {fmtVND(t.amount)}</span>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              <button className="btn secondary small" onClick={() => setEditing({ ...t, amount: String(t.amount) })}>Sửa</button>
+              <button className="btn secondary small" onClick={() => {
+                if (t.payment_id) { alert('Khoản này gắn với lệnh chuyển khoản — hãy chốt hoặc hủy lệnh ở tab Ngân hàng, không sửa riêng ở đây.'); return; }
+                setEditing({ ...t, amount: String(t.amount) });
+              }}>Sửa</button>
               <button className="btn danger small" onClick={() => remove(t)}>Xóa</button>
+              {t.payment_id && <a className="btn secondary small" href={`/chuyen-khoan/${t.payment_id}`}>Mở lệnh CK</a>}
             </div>
           </div>
         ))}
 
-      <button className="fab" aria-label="Ghi khoản mới" onClick={() => setEditing({ ...EMPTY })}>+</button>
+      {showReview && editing && (() => {
+        const acc = accounts.find(a => a.id === payAccountId);
+        return (
+          <div className="modal-bg" onClick={() => setShowReview(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <h2>Xem lại trước khi chuyển</h2>
+              <p className="muted" style={{ lineHeight: 1.8 }}>
+                Số tiền: <b>{fmtVND(editing.amount)}</b><br />
+                Cho: <b>{name(tags.persons, editing.person_id)}</b><br />
+                {acc ? (<>Ngân hàng: <b>{acc.bank_name}</b><br />Số TK: <b>{acc.account_number}</b><br />
+                {acc.holder_name ? (<>Chủ TK: <b>{acc.holder_name}</b><br /></>) : null}
+                {acc.note ? (<>Ghi chú TK: {acc.note}<br /></>) : null}</>) : null}
+                Nội dung chuyển khoản: <b>{cleanMemo(editing.note) || 'Chuyen khoan'}</b><br />
+                Ngày: {editing.date}
+              </p>
+              <p className="muted">
+                Bấm “Tạo lệnh” là app sẽ ghi ngay khoản này vào sổ ở trạng thái <b>Chờ xác nhận</b>
+                (chưa tính vào số đã chốt) và mở màn hình mã QR để bạn chuyển bên app ngân hàng.
+              </p>
+              <div className="modal-actions">
+                <button type="button" className="btn secondary" onClick={() => setShowReview(false)}>Quay lại sửa</button>
+                <button type="button" className="btn" disabled={payBusy} onClick={createBankPayment}>Tạo lệnh &amp; mở app ngân hàng</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <button className="fab" aria-label="Ghi khoản mới" onClick={() => { setEditing({ ...EMPTY }); setPayMode(false); setPayAccountId(''); }}>+</button>
 
       {editing && (
         <div className="modal-bg" onClick={() => setEditing(null)}>
@@ -156,6 +237,26 @@ export default function SoTienPage() {
               <label className="field"><span>Ghi chú</span>
                 <input value={editing.note || ''} onChange={e => setEditing({ ...editing, note: e.target.value })} placeholder="VD: tiền học cho con" />
               </label>
+              {!editing.id && editing.type === 'chi' && (
+                <label className="field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" style={{ width: 'auto' }} checked={payMode}
+                    onChange={e => { setPayMode(e.target.checked); if (!e.target.checked) setShowReview(false); }} />
+                  <span style={{ fontSize: 14 }}>Thanh toán khoản này qua ngân hàng (tạo mã VietQR)</span>
+                </label>
+              )}
+              {payMode && !editing.id && editing.type === 'chi' && (
+                <label className="field"><span>Tài khoản nhận tiền</span>
+                  <select value={payAccountId} onChange={e => setPayAccountId(e.target.value)}>
+                    <option value="">— Chọn tài khoản —</option>
+                    {accounts.filter(a => !editing.person_id || a.person_id === editing.person_id).map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.bank_name} · {a.account_number}{a.holder_name ? ` (${a.holder_name})` : ''}{a.note ? ` — ${a.note}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="muted">Chỉ hiện tài khoản của người đã chọn ở trên. Chưa có tài khoản thì vào tab Ngân hàng để thêm (quét QR hoặc nhập tay).</span>
+                </label>
+              )}
               <div className="modal-actions">
                 <button type="button" className="btn secondary" onClick={() => setEditing(null)}>Hủy</button>
                 <button type="submit" className="btn">Lưu</button>
