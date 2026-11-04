@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../../components/AppShell';
 import { useRequireAuth } from '../../components/useRequireAuth';
 import TagSelect from '../../components/TagSelect';
+import MoneyInput from '../../components/MoneyInput';
 import { supabase } from '../../lib/supabaseClient';
 import { fetchTransactions, fetchTags } from '../../lib/data';
 import { fmtVND, todayISO } from '../../lib/format';
@@ -41,6 +42,7 @@ export default function SoTienPage() {
 
   async function save(e) {
     e.preventDefault();
+    if (!editing.amount || Number(editing.amount) < 1) { alert('Nhập số tiền lớn hơn 0.'); return; }
     const payload = {
       user_id: user.id, type: editing.type, amount: Number(editing.amount),
       date: editing.date, person_id: editing.person_id || null,
@@ -139,8 +141,8 @@ export default function SoTienPage() {
                 <button type="button" className={editing.type === 'chi' ? 'on-chi' : ''} onClick={() => setEditing({ ...editing, type: 'chi' })}>Chi ra</button>
               </div>
               <label className="field"><span>Số tiền (đ)</span>
-                <input type="number" inputMode="numeric" required min="1" value={editing.amount}
-                  onChange={e => setEditing({ ...editing, amount: e.target.value })} placeholder="VD: 500000" />
+                <MoneyInput value={editing.amount}
+                  onChange={v => setEditing({ ...editing, amount: v })} placeholder="VD: 500.000" />
               </label>
               <label className="field"><span>Ngày</span>
                 <input type="date" required value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} />
