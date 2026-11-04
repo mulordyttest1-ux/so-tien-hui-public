@@ -5,12 +5,29 @@ import { useRequireAuth } from '../../components/useRequireAuth';
 import { CALC_TEMPLATES } from '../../lib/calcTemplates';
 import { solveValues } from '../../lib/solver';
 
-// Hiển thị số: tiền làm tròn tới đồng (tối đa 2 số lẻ khi cần), % tối đa 4 số lẻ.
+const DAY_MS = 86400000;
+
+// Ngày <-> số ngày kể từ 01/01/1970 (UTC), để bộ máy số học xử lý được phép trừ ngày.
+function dateToEpoch(str) {
+  const t = Date.parse(str + 'T00:00:00Z');
+  return Number.isFinite(t) ? Math.round(t / DAY_MS) : NaN;
+}
+function epochToDate(n) {
+  return new Date(Math.round(n) * DAY_MS).toISOString().slice(0, 10);
+}
+function fmtDateVn(str) {
+  if (!str) return '';
+  const [y, m, d] = str.split('-');
+  return `${d}/${m}/${y}`;
+}
 function fmtNum(v, kind) {
   if (v === undefined || v === null || !Number.isFinite(v)) return '';
   const maxDec = kind === 'pct' ? 4 : 2;
   const rounded = Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v) : Number(v.toFixed(maxDec));
   return rounded.toLocaleString('vi-VN', { maximumFractionDigits: maxDec });
+}
+function fmtMoney(v) {
+  return v === undefined ? '' : fmtNum(v, 'money') + 'đ';
 }
 
 export default function TinhNhanhPage() {
@@ -24,7 +41,9 @@ export default function TinhNhanhPage() {
     const known = {};
     for (const f of tpl.fields) {
       if (raw[f.key] !== undefined && raw[f.key] !== '') {
-        const n = Number(String(raw[f.key]).replace(/[\s.]/g, '').replace(',', '.'));
+        const n = f.kind === 'date'
+          ? dateToEpoch(raw[f.key])
+          : Number(String(raw[f.key]).replace(/[\s.]/g, '').replace(',', '.'));
         if (Number.isFinite(n)) known[f.key] = n;
       } else if (f.default !== undefined) {
         known[f.key] = f.default;
@@ -35,7 +54,51 @@ export default function TinhNhanhPage() {
 
   if (loading || !user) return <div className="loading">Đang tải…</div>;
 
-  const filledCount = tpl.fields.filter(f => solved[f.key] !== undefined).length;
+  // Kết quả nổi bật: tiền lời trong khoảng ngày (nếu có), nếu không thì lời/tháng.
+  const hasKhoang = solved.tienLoiKhoang !== undefined;
+  const heroAmount = hasKhoang ? fmtMoney(solved.tienLoiKhoang) : (solved.loiThang !== undefined ? fmtMoney(solved.loiThang) : null);
+  const heroLabel = hasKhoang ? 'Tiền lời trong khoảng ngày' : 'Tiền lời mỗi tháng';
+  const heroSub = hasKhoang
+    ? [
+        solved.ngayBatDau !== undefined ? `Từ ${fmtDateVn(epochToDate(solved.ngayBatDau))}` : '',
+        solved.ngayKetThuc !== undefined ? `đến ${fmtDateVn(epochToDate(solved.ngayKetThuc))}` : '',
+        solved.soNgayKhoang !== undefined ? `· ${fmtNum(solved.soNgayKhoang, 'int')} ngày` : '',
+      ].filter(Boolean).join(' ')
+    : (solved.loiNgay !== undefined ? `≈ ${fmtMoney(solved.loiNgay)} / ngày` : '');
+
+  function fieldView(f) {
+    const isGiven = raw[f.key] !== undefined && raw[f.key] !== '';
+    const isDefault = !isGiven && f.default !== undefined;
+    const derived = !isGiven && !isDefault && solved[f.key] !== undefined;
+    let value = '';
+    if (isGiven) value = raw[f.key];
+    else if (f.kind === 'date' && solved[f.key] !== undefined) value = epochToDate(solved[f.key]);
+    else if (solved[f.key] !== undefined) value = fmtNum(solved[f.key], f.kind);
+    return { isGiven, isDefault, derived, value };
+  }
+
+  function renderField(f) {
+    const { derived, isDefault, value } = fieldView(f);
+    return (
+      <label className="field" key={f.key}>
+        <span>{f.label} {f.unit && <span className="muted">({f.unit})</span>}
+          {derived && <span className="chip">tự tính</span>}
+          {isDefault && <span className="muted" style={{ marginLeft: 6 }}>mặc định</span>}
+        </span>
+        <input
+          type={f.kind === 'date' ? 'date' : 'text'}
+          inputMode={f.kind === 'date' ? undefined : 'decimal'}
+          value={value}
+          placeholder={f.placeholder || 'Chưa có dữ kiện'}
+          onChange={e => setRaw(prev => ({ ...prev, [f.key]: e.target.value }))}
+          className={derived ? 'derived' : ''}
+        />
+      </label>
+    );
+  }
+
+  const sections = tpl.sections || [{ id: 'all', title: '', hint: '' }];
+  const fieldsOf = (sid) => tpl.fields.filter(f => (f.section || 'all') === sid);
 
   return (
     <AppShell userEmail={user.email}>
@@ -46,37 +109,37 @@ export default function TinhNhanhPage() {
         <button className="btn secondary" onClick={() => setRaw({})}>Xóa hết, tính lại</button>
       </div>
 
-      <div className="card">
-        <h3>{tpl.icon} {tpl.name}</h3>
-        <p className="muted" style={{ marginTop: 4 }}>{tpl.desc}</p>
-        <p className="muted">Ô ghi <b>“tự tính”</b> là app tự suy ra từ các ô bạn đã nhập — bạn gõ đè vào ô đó cũng được, app sẽ tính tiếp theo số của bạn. Đã có dữ kiện: {filledCount}/{tpl.fields.length} ô.</p>
+      {/* Kết quả nổi bật lên đầu, theo cách các app tính tiền đẹp vẫn làm:
+          đáp án trước, chi tiết sau — không còn danh sách dài lê thê. */}
+      <div className="hero">
+        <div className="hero-label">{tpl.icon} {heroLabel}</div>
+        <div className="hero-amount">{heroAmount || '—'}</div>
+        <div className="hero-sub">{heroAmount ? heroSub : 'Nhập 2 ô bất kỳ bên dưới để bắt đầu tính.'}</div>
       </div>
 
-      <div className="card">
-        {tpl.fields.map(f => {
-          const isGiven = raw[f.key] !== undefined && raw[f.key] !== '';
-          const isDefault = !isGiven && f.default !== undefined;
-          const derived = !isGiven && !isDefault && solved[f.key] !== undefined;
-          const value = isGiven ? raw[f.key] : (solved[f.key] !== undefined ? fmtNum(solved[f.key], f.kind) : '');
-          return (
-            <label className="field" key={f.key}>
-              <span>{f.label} {f.unit && <span className="muted">({f.unit})</span>}
-                {derived && <span className="thu" style={{ marginLeft: 6 }}>· tự tính</span>}
-                {isDefault && <span className="muted" style={{ marginLeft: 6 }}>· mặc định, sửa được</span>}
-              </span>
-              <input
-                type="text" inputMode="decimal"
-                value={value}
-                placeholder={f.placeholder || 'Chưa có dữ kiện'}
-                onChange={e => setRaw(prev => ({ ...prev, [f.key]: e.target.value }))}
-                style={derived ? { background: '#f0f7f0' } : undefined}
-              />
-            </label>
-          );
-        })}
-      </div>
+      {sections.map(sec => {
+        const fs = fieldsOf(sec.id);
+        if (!fs.length) return null;
+        const body = (
+          <>
+            {sec.hint && <p className="muted" style={{ marginTop: 0 }}>{sec.hint}</p>}
+            <div className="grid2">{fs.map(renderField)}</div>
+          </>
+        );
+        return sec.collapsed ? (
+          <details className="card" key={sec.id}>
+            <summary className="section-title">{sec.title} <span className="muted">— xem thêm</span></summary>
+            <div style={{ marginTop: 10 }}>{body}</div>
+          </details>
+        ) : (
+          <div className="card" key={sec.id}>
+            <h3 className="section-title">{sec.title}</h3>
+            {body}
+          </div>
+        );
+      })}
 
-      <p className="muted">Mẫu tính mới sẽ được thêm vào đây khi phát sinh bài toán mới — chỉ cần khai báo thêm các ô và công thức ràng buộc, bộ máy tự tính không phải sửa.</p>
+      <p className="muted">Ô gắn chip “tự tính” là app tự suy ra — bạn gõ đè vào cũng được, app tính tiếp theo số của bạn. Mẫu tính mới sẽ được thêm khi phát sinh bài toán mới.</p>
     </AppShell>
   );
 }
