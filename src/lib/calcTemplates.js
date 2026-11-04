@@ -33,6 +33,9 @@ export const CALC_TEMPLATES = [
       { key: 'ngayKetThuc', label: 'Đến ngày', kind: 'date', section: 'khoang' },
       { key: 'soNgayKhoang', label: 'Số ngày tính lời', unit: 'ngày', kind: 'int', section: 'khoang', placeholder: 'VD: 12' },
       { key: 'tienLoiKhoang', label: 'Tiền lời trong khoảng', unit: 'đ', kind: 'money', section: 'khoang' },
+      // 1 = tính cả ngày đầu (đến − từ + 1), 0 = chỉ tính hiệu số (đến − từ).
+      // Mặc định bật, theo yêu cầu của người dùng.
+      { key: 'coNgayDau', label: 'Tính cả ngày đầu', kind: 'bool', section: 'khoang', default: 1 },
     ],
     // Quan hệ gốc: lời tháng <-> lời ngày <-> lời năm; lời <-> vốn qua
     // "lời trên 1 triệu" và qua lãi suất %. Mọi luật đều có chiều ngược.
@@ -67,11 +70,11 @@ export const CALC_TEMPLATES = [
       { inputs: ['laiThang', 'soNgay'], output: 'laiNgay', compute: (pc, n) => pc / n },
       { inputs: ['laiNgay', 'soNgay'], output: 'laiThang', compute: (pc, n) => pc * n },
       { inputs: ['loiNgay', 'von'], output: 'laiNgay', compute: (d, p) => (d / p) * 100 },
-      // Khoảng ngày: đến − từ = số ngày; tiền lời khoảng = lời/ngày × số ngày.
-      // "Số ngày" ở đây là hiệu số (15/11 → 27/11 = 12 ngày), đúng cách người dùng tính.
-      { inputs: ['ngayKetThuc', 'ngayBatDau'], output: 'soNgayKhoang', compute: (e, s) => e - s },
-      { inputs: ['ngayBatDau', 'soNgayKhoang'], output: 'ngayKetThuc', compute: (s, n) => s + n },
-      { inputs: ['ngayKetThuc', 'soNgayKhoang'], output: 'ngayBatDau', compute: (e, n) => e - n },
+      // Khoảng ngày: số ngày = đến − từ + (tính cả ngày đầu ? 1 : 0);
+      // tiền lời khoảng = lời/ngày × số ngày.
+      { inputs: ['ngayKetThuc', 'ngayBatDau', 'coNgayDau'], output: 'soNgayKhoang', compute: (e, s, c) => e - s + c },
+      { inputs: ['ngayBatDau', 'soNgayKhoang', 'coNgayDau'], output: 'ngayKetThuc', compute: (s, n, c) => s + n - c },
+      { inputs: ['ngayKetThuc', 'soNgayKhoang', 'coNgayDau'], output: 'ngayBatDau', compute: (e, n, c) => e - n + c },
       { inputs: ['loiNgay', 'soNgayKhoang'], output: 'tienLoiKhoang', compute: (d, n) => d * n },
       { inputs: ['tienLoiKhoang', 'soNgayKhoang'], output: 'loiNgay', compute: (t, n) => t / n },
       { inputs: ['tienLoiKhoang', 'loiNgay'], output: 'soNgayKhoang', compute: (t, d) => t / d },
