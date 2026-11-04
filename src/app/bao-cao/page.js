@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../../components/AppShell';
 import { useRequireAuth } from '../../components/useRequireAuth';
 import { fetchTransactions, fetchTags } from '../../lib/data';
+import { isSettled, isPendingTx } from '../../lib/payments';
 import { fmtVND, todayISO } from '../../lib/format';
 
 function aggregate(txs, key, tags) {
@@ -32,7 +33,9 @@ export default function BaoCaoPage() {
       .catch(e => alert(e.message));
   }, [user]);
 
-  const monthTxs = useMemo(() => txs.filter(t => t.date.startsWith(month)), [txs, month]);
+  // Bao cao chi tinh tien DA CHOT; tien cho xac nhan / da huy tach rieng.
+  const monthTxs = useMemo(() => txs.filter(t => t.date.startsWith(month) && isSettled(t)), [txs, month]);
+  const monthPending = useMemo(() => txs.filter(t => t.date.startsWith(month) && isPendingTx(t)), [txs, month]);
   const byPerson = useMemo(() => aggregate(monthTxs, 'person_id', tags.persons), [monthTxs, tags]);
   const byCategory = useMemo(() => aggregate(monthTxs, 'category_id', tags.categories), [monthTxs, tags]);
   const bySource = useMemo(() => aggregate(monthTxs.filter(t => t.type === 'thu'), 'source_id', tags.sources), [monthTxs, tags]);
@@ -62,6 +65,12 @@ export default function BaoCaoPage() {
         <input type="month" value={month} onChange={e => setMonth(e.target.value)} />
       </label>
       {!ready ? <div className="loading">Đang tải báo cáo…</div> : (<>
+        {monthPending.length > 0 && (
+          <div className="card" style={{ border: '2px solid #d97706', background: '#fffbeb' }}>
+            Tháng này còn {monthPending.length} khoản chờ xác nhận qua ngân hàng
+            (tổng {fmtVND(monthPending.reduce((s, t) => s + Number(t.amount), 0))}) — chưa tính vào các bảng dưới.
+          </div>
+        )}
         <div className="card">
           <h3>Theo người — ai thu, ai chi (cùng 1 người có cả 2)</h3>
           {renderTable(byPerson)}
