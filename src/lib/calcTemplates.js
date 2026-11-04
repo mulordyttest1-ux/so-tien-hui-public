@@ -10,17 +10,29 @@ export const CALC_TEMPLATES = [
     name: 'Lãi thu thụ động',
     icon: '💸',
     desc: 'Đưa vốn cho một nguồn (người A, người B...) và nhận tiền lời. Nhập bất kỳ 2 ô nào bạn biết — các ô còn lại tự suy ra.',
+    // Các trường được gom thành nhóm để giao diện hiển thị gọn theo từng nhóm.
+    sections: [
+      { id: 'chinh', title: 'Vốn & tiền lời', hint: 'Nhập 2 ô bất kỳ trong nhóm này là đủ suy ra các ô còn lại.' },
+      { id: 'quydoi', title: 'Quy đổi theo 1 triệu & lãi suất', hint: 'Các ô này tự suy ra từ nhóm trên — bấm để xem.', collapsed: true },
+      { id: 'khoang', title: 'Tính lời theo khoảng ngày', hint: 'Có dữ kiện lời/ngày rồi thì: nhập từ ngày + đến ngày, hoặc từ ngày + số ngày, hoặc chỉ số ngày — đều ra tiền lời.' },
+    ],
     fields: [
-      { key: 'von', label: 'Vốn đưa đi', unit: 'đ', kind: 'money', placeholder: 'VD: 1000000000' },
-      { key: 'loiThang', label: 'Tiền lời mỗi tháng', unit: 'đ/tháng', kind: 'money', placeholder: 'VD: 3000000' },
-      { key: 'loiNgay', label: 'Tiền lời mỗi ngày', unit: 'đ/ngày', kind: 'money' },
-      { key: 'loiNam', label: 'Tiền lời mỗi năm', unit: 'đ/năm', kind: 'money' },
-      { key: 'moiTrieuNgay', label: 'Lời trên mỗi 1 triệu / ngày', unit: 'đ', kind: 'money', placeholder: 'VD: 250' },
-      { key: 'moiTrieuThang', label: 'Lời trên mỗi 1 triệu / tháng', unit: 'đ', kind: 'money' },
-      { key: 'laiNgay', label: 'Lãi suất % / ngày', unit: '%', kind: 'pct' },
-      { key: 'laiThang', label: 'Lãi suất % / tháng', unit: '%', kind: 'pct' },
-      { key: 'laiNam', label: 'Lãi suất % / năm', unit: '%', kind: 'pct' },
-      { key: 'soNgay', label: 'Số ngày trong tháng (để quy đổi)', unit: 'ngày', kind: 'int', default: 30 },
+      { key: 'von', label: 'Vốn đưa đi', unit: 'đ', kind: 'money', section: 'chinh', placeholder: 'VD: 1000000000' },
+      { key: 'loiThang', label: 'Tiền lời mỗi tháng', unit: 'đ/tháng', kind: 'money', section: 'chinh', placeholder: 'VD: 3000000' },
+      { key: 'loiNgay', label: 'Tiền lời mỗi ngày', unit: 'đ/ngày', kind: 'money', section: 'chinh' },
+      { key: 'loiNam', label: 'Tiền lời mỗi năm', unit: 'đ/năm', kind: 'money', section: 'chinh' },
+      { key: 'moiTrieuNgay', label: 'Lời trên mỗi 1 triệu / ngày', unit: 'đ', kind: 'money', section: 'quydoi', placeholder: 'VD: 250' },
+      { key: 'moiTrieuThang', label: 'Lời trên mỗi 1 triệu / tháng', unit: 'đ', kind: 'money', section: 'quydoi' },
+      { key: 'laiNgay', label: 'Lãi suất % / ngày', unit: '%', kind: 'pct', section: 'quydoi' },
+      { key: 'laiThang', label: 'Lãi suất % / tháng', unit: '%', kind: 'pct', section: 'quydoi' },
+      { key: 'laiNam', label: 'Lãi suất % / năm', unit: '%', kind: 'pct', section: 'quydoi' },
+      { key: 'soNgay', label: 'Số ngày trong tháng (để quy đổi)', unit: 'ngày', kind: 'int', section: 'quydoi', default: 30 },
+      // Khoảng ngày: ngày được lưu trong bộ máy dưới dạng "số ngày kể từ 01/01/1970 (UTC)"
+      // để bộ máy số học xử lý được (đến ngày − từ ngày = số ngày tính lời).
+      { key: 'ngayBatDau', label: 'Từ ngày', kind: 'date', section: 'khoang' },
+      { key: 'ngayKetThuc', label: 'Đến ngày', kind: 'date', section: 'khoang' },
+      { key: 'soNgayKhoang', label: 'Số ngày tính lời', unit: 'ngày', kind: 'int', section: 'khoang', placeholder: 'VD: 12' },
+      { key: 'tienLoiKhoang', label: 'Tiền lời trong khoảng', unit: 'đ', kind: 'money', section: 'khoang' },
     ],
     // Quan hệ gốc: lời tháng <-> lời ngày <-> lời năm; lời <-> vốn qua
     // "lời trên 1 triệu" và qua lãi suất %. Mọi luật đều có chiều ngược.
@@ -55,6 +67,14 @@ export const CALC_TEMPLATES = [
       { inputs: ['laiThang', 'soNgay'], output: 'laiNgay', compute: (pc, n) => pc / n },
       { inputs: ['laiNgay', 'soNgay'], output: 'laiThang', compute: (pc, n) => pc * n },
       { inputs: ['loiNgay', 'von'], output: 'laiNgay', compute: (d, p) => (d / p) * 100 },
+      // Khoảng ngày: đến − từ = số ngày; tiền lời khoảng = lời/ngày × số ngày.
+      // "Số ngày" ở đây là hiệu số (15/11 → 27/11 = 12 ngày), đúng cách người dùng tính.
+      { inputs: ['ngayKetThuc', 'ngayBatDau'], output: 'soNgayKhoang', compute: (e, s) => e - s },
+      { inputs: ['ngayBatDau', 'soNgayKhoang'], output: 'ngayKetThuc', compute: (s, n) => s + n },
+      { inputs: ['ngayKetThuc', 'soNgayKhoang'], output: 'ngayBatDau', compute: (e, n) => e - n },
+      { inputs: ['loiNgay', 'soNgayKhoang'], output: 'tienLoiKhoang', compute: (d, n) => d * n },
+      { inputs: ['tienLoiKhoang', 'soNgayKhoang'], output: 'loiNgay', compute: (t, n) => t / n },
+      { inputs: ['tienLoiKhoang', 'loiNgay'], output: 'soNgayKhoang', compute: (t, d) => t / d },
     ],
   },
 ];
