@@ -5,6 +5,7 @@ import AppShell from '../components/AppShell';
 import { useRequireAuth } from '../components/useRequireAuth';
 import { fetchTransactions, fetchHui } from '../lib/data';
 import { fetchTags } from '../lib/data';
+import { fetchPayments, isSettled, isPendingTx } from '../lib/payments';
 import { fmtVND, todayISO, thisWeekRange, thisMonthRange, inRange, sumByType, calcHuiGroup } from '../lib/format';
 
 export default function DashboardPage() {
@@ -12,12 +13,13 @@ export default function DashboardPage() {
   const [txs, setTxs] = useState([]);
   const [hui, setHui] = useState({ groups: [], rounds: [] });
   const [tags, setTags] = useState({ persons: [], categories: [], sources: [] });
+  const [payments, setPayments] = useState([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([fetchTransactions(), fetchHui(), fetchTags()])
-      .then(([t, h, tg]) => { setTxs(t); setHui(h); setTags(tg); setReady(true); })
+    Promise.all([fetchTransactions(), fetchHui(), fetchTags(), fetchPayments()])
+      .then(([t, h, tg, pay]) => { setTxs(t); setHui(h); setTags(tg); setPayments(pay); setReady(true); })
       .catch(e => alert('Không tải được dữ liệu: ' + e.message));
   }, [user]);
 
@@ -27,16 +29,27 @@ export default function DashboardPage() {
   const today = todayISO();
   const week = thisWeekRange();
   const month = thisMonthRange();
-  const monthTxs = txs.filter(t => inRange(t.date, month));
+  // Chi tinh tien DA CHOT vao cac con so chinh; tien cho xac nhan tach rieng.
+  const settledTxs = txs.filter(isSettled);
+  const pendingPayments = payments.filter(p => p.status === 'pending');
+  const pendingTotal = pendingPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const monthTxs = settledTxs.filter(t => inRange(t.date, month));
   const monthThu = sumByType(monthTxs, 'thu');
   const monthChi = sumByType(monthTxs, 'chi');
-  const todayTxs = txs.filter(t => t.date === today);
-  const weekTxs = txs.filter(t => inRange(t.date, week));
+  const todayTxs = settledTxs.filter(t => t.date === today);
+  const weekTxs = settledTxs.filter(t => inRange(t.date, week));
   const personName = id => tags.persons.find(p => p.id === id)?.name || '';
   const catName = id => tags.categories.find(c => c.id === id)?.name || '';
 
   return (
     <AppShell userEmail={user.email}>
+      {pendingPayments.length > 0 && (
+        <div className="card" style={{ border: '2px solid #d97706', background: '#fffbeb' }}>
+          <b>⏳ {pendingPayments.length} lệnh chuyển khoản đang chờ xác nhận</b>
+          <span className="muted"> — tổng {fmtVND(pendingTotal)} chưa tính vào các số bên dưới. </span>
+          <Link href="/ngan-hang">Chốt ngay →</Link>
+        </div>
+      )}
       <div className="card">
         <div className="muted">Còn lại tháng này</div>
         <div className="big">{fmtVND(monthThu - monthChi)}</div>
@@ -86,6 +99,8 @@ export default function DashboardPage() {
           <div className="row" key={t.id}>
             <span>
               {t.note || catName(t.category_id) || (t.type === 'thu' ? 'Khoản thu' : 'Khoản chi')}
+              {t.status === 'pending' && <span className="badge-pending" style={{ marginLeft: 6 }}>Chờ xác nhận</span>}
+              {t.status === 'voided' && <span className="badge-void" style={{ marginLeft: 6 }}>Đã hủy</span>}
               <br /><span className="muted">{t.date}{personName(t.person_id) ? ' · ' + personName(t.person_id) : ''}{catName(t.category_id) ? ' · ' + catName(t.category_id) : ''}</span>
             </span>
             <span className={t.type === 'thu' ? 'thu' : 'chi'}>
