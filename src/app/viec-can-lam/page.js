@@ -55,8 +55,8 @@ export default function ViecCanLamPage() {
 
       <form onSubmit={save} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <input value={text} onChange={e => setText(e.target.value)}
-          placeholder="VD: Nhắc chị B đóng hụi, mua gạo, gọi VNPT hỏi cước…" style={{ flex: 1 }} />
-        <button className="btn" type="submit" disabled={busy || !text.trim()}>Thêm</button>
+          placeholder="VD: Nhắc chị B đóng hụi, mua gạo, gọi VNPT hỏi cước…" style={{ flex: 1, minWidth: 0 }} />
+        <button className="btn" type="submit" disabled={busy || !text.trim()} style={{ width: 'auto', flex: 'none' }}>Thêm</button>
       </form>
 
       {!ready ? <div className="loading">Đang tải…</div>
