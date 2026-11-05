@@ -70,8 +70,8 @@ export default function TroLyGroqPage() {
       <form onSubmit={e => { e.preventDefault(); send(); }}
         style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         <input value={text} onChange={e => setText(e.target.value)}
-          placeholder="Hỏi trợ lý Groq…" style={{ flex: 1 }} />
-        <button className="btn" type="submit" disabled={busy || !text.trim()}>Gửi</button>
+          placeholder="Hỏi trợ lý Groq…" style={{ flex: 1, minWidth: 0 }} />
+        <button className="btn" type="submit" disabled={busy || !text.trim()} style={{ width: 'auto', flex: 'none' }}>Gửi</button>
       </form>
     </AppShell>
   );
