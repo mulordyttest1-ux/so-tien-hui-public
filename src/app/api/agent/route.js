@@ -10,7 +10,10 @@ import { isSettled } from '../../../lib/payments';
 import { RECURRING_KIND_LABELS } from '../../../lib/recurring';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.3-70b-versatile';
+// 2026-08-16 Groq ngung phuc vu llama-3.3-70b-versatile cho goi free/developer
+// (chi con Enterprise) — model thay the chinh thuc la openai/gpt-oss-120b,
+// cung gioi han free (30 RPM, 1.000 req/ngay). Dung llama nua se bi Groq tra loi.
+const MODEL = 'openai/gpt-oss-120b';
 
 const SYSTEM = `Bạn là trợ lý trong app Gia Đình Nhỏ — app ghi thu chi, quỹ nhóm, định kỳ và việc cần làm của một gia đình.
 Trả lời bằng tiếng Việt, ngắn gọn, dùng đúng tên mục trong app: Thu Chi, Quỹ Nhóm, Định kỳ, Việc cần làm, Tính nhanh, Ngân hàng, Báo cáo.
@@ -119,9 +122,12 @@ export async function POST(req) {
       return Response.json({ reply: 'Không gọi được Groq lúc này, bạn thử lại sau ít phút nhé.' }, { status: 502 });
     }
     if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      // Tam thoi hien loi that cua Groq de chan doan (se go sau khi sua xong).
+      console.error('Groq error', res.status, errText.slice(0, 500));
       if (res.status === 429) return Response.json({ reply: 'Hôm nay đã hết lượt miễn phí của Groq rồi, mai hỏi lại nhé.' }, { status: 429 });
       if (res.status === 401) return Response.json({ reply: 'Khóa Groq không dùng được nữa, cần gắn khóa mới trong cài đặt Vercel.' }, { status: 502 });
-      return Response.json({ reply: 'Groq trả lỗi, bạn thử lại sau ít phút nhé.' }, { status: 502 });
+      return Response.json({ reply: `Groq trả lỗi (mã ${res.status}): ${errText.slice(0, 300) || 'không rõ nguyên nhân'} — bạn thử lại sau ít phút nhé.` }, { status: 502 });
     }
     const data = await res.json();
     const msg = data?.choices?.[0]?.message;
