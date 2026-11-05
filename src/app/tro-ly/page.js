@@ -46,7 +46,7 @@ export default function TroLyPage() {
       <h2>🤖 Trợ lý</h2>
       <p className="muted">
         Hỏi về sổ của bạn — thu chi, hạn đóng, quỹ nhóm, việc cần làm — trợ lý tra ngay số thật trong app rồi trả lời.
-        Bản đầu chỉ đọc và ghi việc cần làm, chưa tự ghi tiền. Câu hỏi của bạn chỉ gửi sang Groq để trả lời, Groq không dùng để huấn luyện.
+        Bản đầu chỉ đọc và ghi việc cần làm, chưa tự ghi tiền. Câu hỏi của bạn được gửi sang Gemini (Google) để trả lời; Google có thể dùng câu hỏi ở gói miễn phí để huấn luyện mô hình.
       </p>
 
       {msgs.length === 0 && (
