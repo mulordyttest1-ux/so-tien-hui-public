@@ -90,6 +90,31 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Dashboard: luoi o chuc nang — moi muc 1 o, them bao nhieu muc
+          cung khong chat bot bar vi bot bar chi hien muc hay mo nhat. */}
+      <div className="card">
+        <h3>🧭 Chức năng</h3>
+        <div className="grid2">
+          {[
+            { href: '/so-tien', icon: '💰', name: 'Sổ tiền', hint: `Tháng này thu ${fmtVND(monthThu)} · chi ${fmtVND(monthChi)}` },
+            { href: '/hui', icon: '🔄', name: 'Hụi', hint: hui.groups.length ? `${hui.groups.length} dây đang chạy` : 'Chưa có dây hụi' },
+            { href: '/ngan-hang', icon: '🏦', name: 'Ngân hàng', hint: pendingPayments.length ? `${pendingPayments.length} lệnh chờ xác nhận` : 'Không có lệnh chờ' },
+            { href: '/dinh-ky', icon: '🔁', name: 'Định kỳ', hint: upcoming.length ? `${upcoming.length} khoản sắp đến hạn` : 'Không có khoản sắp đến hạn' },
+            { href: '/tinh-nhanh', icon: '🧮', name: 'Tính nhanh', hint: 'Lãi, quy đổi, tính theo ngày' },
+            { href: '/bao-cao', icon: '📊', name: 'Báo cáo', hint: 'Tổng quan theo tháng' },
+            { href: '/quet-qr', icon: '📷', name: 'Quét QR', hint: 'Quét mã để chuyển tiền' },
+            { href: '/chuyen-nhanh', icon: '⚡', name: 'Chuyển nhanh', hint: 'Chuyển tiền không cần quét' },
+          ].map(t => (
+            <Link key={t.href} href={t.href} className="card"
+              style={{ textAlign: 'center', textDecoration: 'none', color: 'inherit', margin: 0 }}>
+              <div style={{ fontSize: 28 }}>{t.icon}</div>
+              <div><b>{t.name}</b></div>
+              <div className="muted" style={{ fontSize: 13 }}>{t.hint}</div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       <div className="grid2">
         <div className="card">
           <h3>Hôm nay</h3>
