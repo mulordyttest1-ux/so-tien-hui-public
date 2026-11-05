@@ -58,7 +58,7 @@ export default function TinhNhanhPage() {
   // Kết quả nổi bật: tiền lời trong khoảng ngày (nếu có), nếu không thì lời/tháng.
   const hasKhoang = solved.tienLoiKhoang !== undefined;
   const heroAmount = hasKhoang ? fmtMoney(solved.tienLoiKhoang) : (solved.loiThang !== undefined ? fmtMoney(solved.loiThang) : null);
-  const heroLabel = hasKhoang ? 'Tiền lời trong khoảng ngày' : 'Tiền lời mỗi tháng';
+  const heroLabel = hasKhoang ? 'Lợi nhuận trong khoảng ngày' : 'Lợi nhuận mỗi tháng';
   const heroSub = hasKhoang
     ? [
         solved.ngayBatDau !== undefined ? `Từ ${fmtDateVn(epochToDate(solved.ngayBatDau))}` : '',
