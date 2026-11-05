@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import katex from 'katex';
 import AppShell from '../../components/AppShell';
 import { useRequireAuth } from '../../components/useRequireAuth';
 import { supabase } from '../../lib/supabaseClient';
@@ -11,12 +12,39 @@ const GOI_Y = [
   'Quỹ nhóm còn phải đóng bao nhiêu?',
 ];
 
-// Model hay tra loi kieu **in dam** — hien thi **...** thanh chu dam that,
-// neu khong nguoi doc se thay dau ** hien ra nguyen xi trong cau tra loi.
-function renderText(text) {
+// Model tra loi toan bang LaTeX ($...$, $$...$$) va **in dam** — trang phai
+// ve lai thanh bieu thuc toan / chu dam that, neu khong se hien ma tho
+// (vi du \frac, \sqrt, ^) nhu chi Nancy thay. KaTeX ve cong thuc;
+// doan nao khong phai toan that thi giu nguyen chu.
+function renderMath(tex, displayMode, key) {
+  let html = '';
+  try { html = katex.renderToString(tex, { displayMode, throwOnError: false }); } catch { html = ''; }
+  if (!html || html.includes('katex-error')) return <span key={key}>{tex}</span>;
+  if (displayMode) return <div key={key} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <span key={key} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function renderBold(text, keyPrefix) {
   return String(text).split(/(\*\*[^*]+\*\*)/g).map((p, i) => {
     const m = p.match(/^\*\*([^*]+)\*\*$/);
-    return m ? <strong key={i}>{m[1]}</strong> : <span key={i}>{p}</span>;
+    return m ? <strong key={keyPrefix + i}>{m[1]}</strong> : <span key={keyPrefix + i}>{p}</span>;
+  });
+}
+
+function isMathContent(s) {
+  // Chuoi trong $...$ chi coi la toan khi co dau hieu toan hoc
+  // (lenh \, mu _, {}...) hoac la phep tinh thuan so.
+  return /[\\^_{}]/.test(s) || /^\s*[\d\s.+\-*/()=<>!]+\s*$/.test(s);
+}
+
+function renderText(text) {
+  const parts = String(text).split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\))/g);
+  return parts.map((p, i) => {
+    let m = p.match(/^\$\$([\s\S]+?)\$\$$/) || p.match(/^\\\[([\s\S]+?)\\\]$/);
+    if (m) return renderMath(m[1], true, 'm' + i);
+    m = p.match(/^\$([^$\n]+?)\$$/) || p.match(/^\\\(([\s\S]+?)\\\)$/);
+    if (m && (p.startsWith('\\(') || isMathContent(m[1]))) return renderMath(m[1], false, 'm' + i);
+    return <span key={'t' + i}>{renderBold(p, 'b' + i + '-')}</span>;
   });
 }
 
