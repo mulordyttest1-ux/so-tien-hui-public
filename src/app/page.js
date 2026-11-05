@@ -42,8 +42,9 @@ export default function DashboardPage() {
   const weekTxs = settledTxs.filter(t => inRange(t.date, week));
   const personName = id => tags.persons.find(p => p.id === id)?.name || '';
   const catName = id => tags.categories.find(c => c.id === id)?.name || '';
-  // Nhac nho dinh ky: ky toi + ngay dao han trong 30 ngay toi hoac da qua han.
-  const upcoming = upcomingItems(recurring, 30);
+  // Nhac nho dinh ky: chi khi con <= 3 ngay nua hoac da qua han.
+  // (Truoc day la 30 ngay nen cac khoan con 16-20 ngay van hien.)
+  const upcoming = upcomingItems(recurring, 3);
   const hasOverdue = upcoming.some(u => u.diff < 0);
 
   return (
