@@ -130,9 +130,12 @@ export async function POST(req) {
       return Response.json({ reply: 'Không gọi được Gemini lúc này, bạn thử lại sau ít phút nhé.' }, { status: 502 });
     }
     if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      // Tam thoi hien loi that cua Gemini de chan doan (se go sau khi sua xong).
+      console.error('Gemini error', res.status, errText.slice(0, 500));
       if (res.status === 429) return Response.json({ reply: 'Hôm nay đã hết lượt miễn phí của Gemini rồi, mai hỏi lại nhé.' }, { status: 429 });
       if (res.status === 401) return Response.json({ reply: 'Khóa Gemini không dùng được nữa, cần gắn khóa mới trong cài đặt Vercel.' }, { status: 502 });
-      return Response.json({ reply: 'Gemini trả lỗi, bạn thử lại sau ít phút nhé.' }, { status: 502 });
+      return Response.json({ reply: `Gemini trả lỗi (mã ${res.status}): ${errText.slice(0, 300) || 'không rõ nguyên nhân'} — bạn thử lại sau ít phút nhé.` }, { status: 502 });
     }
     const data = await res.json();
     const msg = data?.choices?.[0]?.message;
