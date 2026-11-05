@@ -121,23 +121,29 @@ export async function POST(req) {
   const messages = [{ role: 'system', content: systemWithDate }, ...history.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')];
 
   for (let step = 0; step < 5; step++) {
-    let res;
-    try {
-      res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: MODEL, messages, tools: TOOLS, tool_choice: 'auto', temperature: 0.2 }),
-      });
-    } catch {
-      return Response.json({ reply: 'Không gọi được Gemini lúc này, bạn thử lại sau ít phút nhé.' }, { status: 502 });
+    // Google luc cao diem hay tra 503 tam thoi — tu thu lai toi da 2 lan
+    // truoc khi bao loi (loi 503 ngay 2026-11-05 la qua tai tam thoi, khong
+    // phai sai cau hinh). Tong cong toi da ~7 giay cho buoc nay.
+    let res = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, attempt === 1 ? 1000 : 2000));
+      try {
+        res = await fetch(GEMINI_URL, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: MODEL, messages, tools: TOOLS, tool_choice: 'auto', temperature: 0.2 }),
+        });
+      } catch {
+        res = null;
+      }
+      if (res && res.status !== 503 && res.status !== 500 && res.status !== 502) break;
     }
+    if (!res) return Response.json({ reply: 'Không gọi được Gemini lúc này, bạn thử lại sau ít phút nhé.' }, { status: 502 });
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      // Tam thoi hien loi that cua Gemini de chan doan (se go sau khi sua xong).
-      console.error('Gemini error', res.status, errText.slice(0, 500));
       if (res.status === 429) return Response.json({ reply: 'Hôm nay đã hết lượt miễn phí của Gemini rồi, mai hỏi lại nhé.' }, { status: 429 });
       if (res.status === 401) return Response.json({ reply: 'Khóa Gemini không dùng được nữa, cần gắn khóa mới trong cài đặt Vercel.' }, { status: 502 });
-      return Response.json({ reply: `Gemini trả lỗi (mã ${res.status}): ${errText.slice(0, 300) || 'không rõ nguyên nhân'} — bạn thử lại sau ít phút nhé.` }, { status: 502 });
+      if (res.status === 503) return Response.json({ reply: 'Gemini đang quá tải lúc này, bạn thử lại sau ít phút nhé.' }, { status: 502 });
+      return Response.json({ reply: 'Gemini trả lỗi, bạn thử lại sau ít phút nhé.' }, { status: 502 });
     }
     const data = await res.json();
     const msg = data?.choices?.[0]?.message;
