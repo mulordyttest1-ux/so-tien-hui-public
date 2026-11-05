@@ -25,7 +25,7 @@ export default function AppShell({ children, userEmail }) {
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="brand">Sổ Tiền &amp; Hụi</span>
+        <span className="brand">Gia Đình Nhỏ</span>
         <span className="topbar-right">
           {userEmail && <span className="email">{userEmail}</span>}
           <button className="link-btn" onClick={logout}>Đăng xuất</button>
