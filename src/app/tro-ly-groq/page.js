@@ -47,7 +47,6 @@ export default function TroLyGroqPage() {
       <p className="muted">
         Hỏi về sổ của bạn — thu chi, hạn đóng, quỹ nhóm, việc cần làm — trợ lý tra ngay số thật trong app rồi trả lời.
         Bản đầu chỉ đọc và ghi việc cần làm, chưa tự ghi tiền. Câu hỏi của bạn được gửi sang Groq để trả lời; Groq cam kết không dùng câu hỏi để huấn luyện mô hình.
-        Khi Trợ lý Gemini quá tải thì mở con này xài.
       </p>
 
       {msgs.length === 0 && (

@@ -1,11 +1,11 @@
-// Tro ly Groq trong app — ban song song voi Tro ly Gemini (/api/agent).
-// Cung chat tieng Viet, cung hieu du lieu THAT cua nguoi dung (thu chi,
+// Tro ly Groq trong app — tro ly duy nhat trong app (Gemini da go bo
+// 2026-11-05 vi goi free cua Google lien tuc loi: model bi ngung, qua tai,
+// het luot). Chat tieng Viet, hieu du lieu THAT cua nguoi dung (thu chi,
 // dinh ky, quy nhom, viec can lam) nho goi cong cu truy van Supabase bang
-// phien cua chinh nguoi do (RLS). Chi khac nha cung cap: Groq
-// (openai/gpt-oss-120b, goi kieu OpenAI-compatible), khoa nam trong bien
-// moi truong GROQ_API_KEY tren Vercel, khong nam trong code. Groq cam ket
-// khong dung du lieu de huan luyen mo hinh. Chi Nancy tu chon mo con nao:
-// khi Gemini qua tai thi mo con Groq nay xai, khong tu dong chuyen.
+// phien cua chinh nguoi do (RLS). Nha cung cap: Groq (openai/gpt-oss-120b,
+// goi kieu OpenAI-compatible), khoa nam trong bien moi truong GROQ_API_KEY
+// tren Vercel, khong nam trong code. Groq cam ket khong dung du lieu de
+// huan luyen mo hinh.
 import { createClient } from '@supabase/supabase-js';
 import { fmtVND, todayISO, thisMonthRange, inRange, sumByType, calcHuiGroup } from '../../../lib/format';
 import { isSettled } from '../../../lib/payments';
