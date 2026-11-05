@@ -11,7 +11,6 @@ import { supabase } from '../lib/supabaseClient';
 const BAR_TABS = [
   { href: '/', label: 'Tổng quan', icon: '🏠' },
   { href: '/tinh-nhanh', label: 'Tính nhanh', icon: '🧮' },
-  { href: '/tro-ly', label: 'Gemini', icon: '🤖' },
   { href: '/tro-ly-groq', label: 'Groq', icon: '⚡' },
 ];
 
