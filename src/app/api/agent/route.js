@@ -16,8 +16,8 @@ import { isSettled } from '../../../lib/payments';
 import { RECURRING_KIND_LABELS } from '../../../lib/recurring';
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-// Google da ngung gemini-2.5-flash cho nguoi dung moi (loi 404 tu API
-// 2026-11-05) — chinh Google goi y gemini-3.8-flash thay the.
+// Model moi nhat con dung duoc (theo loi khuyen cua Google 2026-11-05).
+// Khi co model moi hon, chi Nancy bao thi doi ten o day la xong.
 const MODEL = 'gemini-3.8-flash';
 
 const SYSTEM = `Bạn là trợ lý trong app Gia Đình Nhỏ — app ghi thu chi, quỹ nhóm, định kỳ và việc cần làm của một gia đình.
@@ -132,9 +132,12 @@ export async function POST(req) {
       return Response.json({ reply: 'Không gọi được Gemini lúc này, bạn thử lại sau ít phút nhé.' }, { status: 502 });
     }
     if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      // Tam thoi hien loi that cua Gemini de chan doan (se go sau khi sua xong).
+      console.error('Gemini error', res.status, errText.slice(0, 500));
       if (res.status === 429) return Response.json({ reply: 'Hôm nay đã hết lượt miễn phí của Gemini rồi, mai hỏi lại nhé.' }, { status: 429 });
       if (res.status === 401) return Response.json({ reply: 'Khóa Gemini không dùng được nữa, cần gắn khóa mới trong cài đặt Vercel.' }, { status: 502 });
-      return Response.json({ reply: 'Gemini trả lỗi, bạn thử lại sau ít phút nhé.' }, { status: 502 });
+      return Response.json({ reply: `Gemini trả lỗi (mã ${res.status}): ${errText.slice(0, 300) || 'không rõ nguyên nhân'} — bạn thử lại sau ít phút nhé.` }, { status: 502 });
     }
     const data = await res.json();
     const msg = data?.choices?.[0]?.message;
