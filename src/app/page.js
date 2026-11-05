@@ -96,8 +96,8 @@ export default function DashboardPage() {
         <h3>🧭 Chức năng</h3>
         <div className="grid2">
           {[
-            { href: '/so-tien', icon: '💰', name: 'Sổ tiền', hint: `Tháng này thu ${fmtVND(monthThu)} · chi ${fmtVND(monthChi)}` },
-            { href: '/hui', icon: '🔄', name: 'Hụi', hint: hui.groups.length ? `${hui.groups.length} dây đang chạy` : 'Chưa có dây hụi' },
+            { href: '/so-tien', icon: '💰', name: 'Thu Chi', hint: `Tháng này thu ${fmtVND(monthThu)} · chi ${fmtVND(monthChi)}` },
+            { href: '/hui', icon: '🔄', name: 'Quỹ Nhóm', hint: hui.groups.length ? `${hui.groups.length} dây đang chạy` : 'Chưa có dây hụi' },
             { href: '/ngan-hang', icon: '🏦', name: 'Ngân hàng', hint: pendingPayments.length ? `${pendingPayments.length} lệnh chờ xác nhận` : 'Không có lệnh chờ' },
             { href: '/dinh-ky', icon: '🔁', name: 'Định kỳ', hint: upcoming.length ? `${upcoming.length} khoản sắp đến hạn` : 'Không có khoản sắp đến hạn' },
             { href: '/tinh-nhanh', icon: '🧮', name: 'Tính nhanh', hint: 'Lãi, quy đổi, tính theo ngày' },
@@ -130,7 +130,7 @@ export default function DashboardPage() {
 
       {hui.groups.length > 0 && (
         <div className="card">
-          <h3>Hụi đang chạy</h3>
+          <h3>Quỹ nhóm đang chạy</h3>
           {hui.groups.map(g => {
             const c = calcHuiGroup(g, hui.rounds.filter(r => r.group_id === g.id));
             return (

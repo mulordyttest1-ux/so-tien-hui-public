@@ -2,10 +2,10 @@ import './globals.css';
 import ServiceWorkerRegister from '../components/ServiceWorkerRegister';
 
 export const metadata = {
-  title: 'Sổ Tiền & Hụi',
+  title: 'Gia Đình Nhỏ',
   description: 'Ghi thu chi theo người, hạng mục, nguồn tiền và quản lý hụi, hốt hụi, lời lỗ.',
   manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Sổ Tiền & Hụi' },
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Gia Đình Nhỏ' },
   icons: {
     icon: '/icons/icon-192.png',
     apple: '/icons/apple-touch-icon.png',
