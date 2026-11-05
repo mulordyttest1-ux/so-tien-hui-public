@@ -107,7 +107,6 @@ export default function DashboardPage() {
             { href: '/quet-qr', icon: '📷', name: 'Quét QR', hint: 'Quét mã để chuyển tiền' },
             { href: '/chuyen-nhanh', icon: '⚡', name: 'Chuyển nhanh', hint: 'Chuyển tiền không cần quét' },
             { href: '/viec-can-lam', icon: '✅', name: 'Việc cần làm', hint: todos.filter(t => !t.done).length ? `${todos.filter(t => !t.done).length} việc chưa xong` : 'Chưa có việc nào' },
-            { href: '/tro-ly', icon: '🤖', name: 'Trợ lý Gemini', hint: 'Hỏi về sổ, hạn đóng, quỹ nhóm…' },
             { href: '/tro-ly-groq', icon: '🚀', name: 'Trợ lý Groq', hint: 'Con dự phòng khi Gemini quá tải…' },
             { href: 'https://muse.ai', icon: '💬', name: 'Nhờ Muse', hint: 'Mở Muse để hỏi / nhờ làm', external: true },
           ].map(t => (
