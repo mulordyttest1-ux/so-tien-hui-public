@@ -7,6 +7,7 @@ import { fetchTransactions, fetchHui } from '../lib/data';
 import { fetchTags } from '../lib/data';
 import { fetchPayments, isSettled, isPendingTx } from '../lib/payments';
 import { fetchRecurringItems, upcomingItems } from '../lib/recurring';
+import { fetchTodos } from '../lib/todos';
 import { fmtVND, todayISO, thisWeekRange, thisMonthRange, inRange, sumByType, calcHuiGroup } from '../lib/format';
 
 export default function DashboardPage() {
@@ -16,12 +17,13 @@ export default function DashboardPage() {
   const [tags, setTags] = useState({ persons: [], categories: [], sources: [] });
   const [payments, setPayments] = useState([]);
   const [recurring, setRecurring] = useState([]);
+  const [todos, setTodos] = useState([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([fetchTransactions(), fetchHui(), fetchTags(), fetchPayments(), fetchRecurringItems()])
-      .then(([t, h, tg, pay, rec]) => { setTxs(t); setHui(h); setTags(tg); setPayments(pay); setRecurring(rec); setReady(true); })
+    Promise.all([fetchTransactions(), fetchHui(), fetchTags(), fetchPayments(), fetchRecurringItems(), fetchTodos()])
+      .then(([t, h, tg, pay, rec, td]) => { setTxs(t); setHui(h); setTags(tg); setPayments(pay); setRecurring(rec); setTodos(td); setReady(true); })
       .catch(e => alert('Không tải được dữ liệu: ' + e.message));
   }, [user]);
 
@@ -104,8 +106,11 @@ export default function DashboardPage() {
             { href: '/bao-cao', icon: '📊', name: 'Báo cáo', hint: 'Tổng quan theo tháng' },
             { href: '/quet-qr', icon: '📷', name: 'Quét QR', hint: 'Quét mã để chuyển tiền' },
             { href: '/chuyen-nhanh', icon: '⚡', name: 'Chuyển nhanh', hint: 'Chuyển tiền không cần quét' },
+            { href: '/viec-can-lam', icon: '✅', name: 'Việc cần làm', hint: todos.filter(t => !t.done).length ? `${todos.filter(t => !t.done).length} việc chưa xong` : 'Chưa có việc nào' },
+            { href: 'https://muse.ai', icon: '💬', name: 'Nhờ Muse', hint: 'Mở Muse để hỏi / nhờ làm', external: true },
           ].map(t => (
             <Link key={t.href} href={t.href} className="card"
+              {...(t.external ? { target: '_blank', rel: 'noopener' } : {})}
               style={{ textAlign: 'center', textDecoration: 'none', color: 'inherit', margin: 0 }}>
               <div style={{ fontSize: 28 }}>{t.icon}</div>
               <div><b>{t.name}</b></div>
