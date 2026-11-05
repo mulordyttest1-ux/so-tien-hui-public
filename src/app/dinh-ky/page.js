@@ -8,7 +8,7 @@ import {
   updateRecurringItem, deleteRecurringItem, recordRecurringPayment,
   RECURRING_KIND_LABELS, daysUntil,
 } from '../../lib/recurring';
-import { fmtVND, todayISO } from '../../lib/format';
+import { fmtVND, todayISO, thisMonthRange } from '../../lib/format';
 
 const EMPTY = {
   name: '', kind: 'installment', amount: '', due_day: '', next_due_date: '',
@@ -81,6 +81,53 @@ export default function DinhKyPage() {
         tới kỳ bấm “Đã đóng” là có log. Mở app lên là thấy ngay khoản sắp đến hạn ở trang chính.
       </p>
       <button className="btn" onClick={() => setEditing({ ...EMPTY })}>+ Thêm khoản định kỳ</button>
+
+      {/* Bang thang nay: khoan nao da xu ly / chua xu ly trong thang.
+          Da xu ly = da co log dong trong thang nay. Chua xu ly = ky toi
+          roi trong thang nay (ke ca qua han) ma chua co log trong thang.
+          Khoan co ky toi o thang sau va chua dong thang nay thi khong
+          hien o bang thang nay. Khoan da xong chi hien khi co log thang nay. */}
+      {ready && items.length > 0 && (() => {
+        const month = thisMonthRange();
+        const monthLabel = `${month.from.slice(5, 7)}/${month.from.slice(0, 4)}`;
+        const board = items.map(it => {
+          const itemLogs = logs[it.id] || [];
+          const paidThisMonth = itemLogs.filter(r => r.paid_date >= month.from && r.paid_date <= month.to);
+          const handled = paidThisMonth.length > 0;
+          const dueThisMonth = it.status === 'active' && it.next_due_date && it.next_due_date <= month.to;
+          return { it, handled, dueThisMonth, lastPaid: paidThisMonth[0] || null };
+        }).filter(b => b.handled || b.dueThisMonth);
+        const boardDone = board.filter(b => b.handled);
+        const boardTodo = board.filter(b => !b.handled);
+        return (
+          <div className="card">
+            <h3>📅 Bảng tháng {monthLabel}</h3>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Đã xử lý {boardDone.length} · Chưa xử lý {boardTodo.length}
+              <br />Đã xử lý = đã có log đóng trong tháng này. Kỳ tới rơi trong tháng này mà chưa có log = chưa xử lý.
+            </p>
+            {board.length === 0 && <div className="muted">Tháng này không có khoản nào đến hạn.</div>}
+            {boardDone.length > 0 && (<>
+              <div className="muted">✅ Đã xử lý:</div>
+              {boardDone.map(b => (
+                <div className="row" key={b.it.id}>
+                  <span>{b.it.name}<br /><span className="muted">Mỗi kỳ {fmtVND(b.it.amount)}</span></span>
+                  <span>Đã đóng {b.lastPaid.paid_date} · − {fmtVND(b.lastPaid.amount)}</span>
+                </div>
+              ))}
+            </>)}
+            {boardTodo.length > 0 && (<>
+              <div className="muted">⏳ Chưa xử lý:</div>
+              {boardTodo.map(b => (
+                <div className="row" key={b.it.id}>
+                  <span>{b.it.name}<br /><span className="muted">Mỗi kỳ {fmtVND(b.it.amount)}</span></span>
+                  <span>{dueLabel(b.it.next_due_date)}</span>
+                </div>
+              ))}
+            </>)}
+          </div>
+        );
+      })()}
 
       {editing && (
         <div className="card">
