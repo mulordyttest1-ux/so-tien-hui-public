@@ -11,6 +11,15 @@ const GOI_Y = [
   'Quỹ nhóm còn phải đóng bao nhiêu?',
 ];
 
+// Model hay tra loi kieu **in dam** — hien thi **...** thanh chu dam that,
+// neu khong nguoi doc se thay dau ** hien ra nguyen xi trong cau tra loi.
+function renderText(text) {
+  return String(text).split(/(\*\*[^*]+\*\*)/g).map((p, i) => {
+    const m = p.match(/^\*\*([^*]+)\*\*$/);
+    return m ? <strong key={i}>{m[1]}</strong> : <span key={i}>{p}</span>;
+  });
+}
+
 export default function TroLyGroqPage() {
   const { user, loading } = useRequireAuth();
   const [msgs, setMsgs] = useState([]);
@@ -61,7 +70,7 @@ export default function TroLyGroqPage() {
         <div key={i} className="card" style={m.role === 'user'
           ? { background: '#eef6f0', marginLeft: 32 }
           : { marginRight: 32 }}>
-          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{m.content}</div>
+          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{renderText(m.content)}</div>
         </div>
       ))}
       {busy && <div className="loading">Trợ lý đang tra sổ…</div>}
