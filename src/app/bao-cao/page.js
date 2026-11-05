@@ -80,7 +80,7 @@ export default function BaoCaoPage() {
           {renderTable(byCategory)}
         </div>
         <div className="card">
-          <h3>Thu theo nguồn tiền (khoản A, B, C…)</h3>
+          <h3>Thu theo nguồn thu (khoản A, B, C…)</h3>
           {renderTable(bySource, false)}
         </div>
         <p className="muted">

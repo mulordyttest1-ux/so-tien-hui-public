@@ -44,7 +44,7 @@ function LoginForm() {
 
   return (
     <div className="auth-wrap">
-      <h1>Sổ Tiền &amp; Hụi</h1>
+      <h1>Gia Đình Nhỏ</h1>
       <p className="muted" style={{ textAlign: 'center' }}>
         Mỗi người một tài khoản — một sổ tiền riêng, không ai thấy của ai.
       </p>
