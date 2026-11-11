@@ -298,14 +298,46 @@ export default function XePage() {
                     {deletingVehicle === selected.id ? 'Chắc xóa xe?' : 'Xóa xe'}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {selected && (
+              <div className="card" style={{ marginTop: 12 }}>
+                <b>📊 Thống kê</b>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
+                  <div>Tổng tiền xăng: <b>{fmtVND(stats.totalFuel)}</b></div>
+                  <div>Tổng lít: <b>{Number(stats.totalLitresAll).toLocaleString('vi-VN')} lít</b> ({stats.totalCount} lần)</div>
+                  <div>Đã chạy: <b>{stats.totalKm ? Math.round(stats.totalKm).toLocaleString('vi-VN') + ' km' : '—'}</b></div>
                   <div>⛽ Trung bình: <b>{fmtKmL(stats.avgKmPerLitre)}</b></div>
+                  <div>Tiền/km: <b>{stats.costPerKm ? fmtVND(Math.round(stats.costPerKm)) + '/km' : '—'}</b></div>
                   <div>Bình gần nhất: <b>{fmtKmL(stats.latestKmPerLitre)}</b></div>
                   <div>Xăng tháng này: <b>{fmtVND(stats.monthTotal)}</b>{stats.monthLitres > 0 && <span className="muted"> ({Number(stats.monthLitres).toLocaleString('vi-VN')} lít, {stats.monthCount} lần)</span>}</div>
-                  <div>Đã chạy: <b>{stats.totalKm ? Math.round(stats.totalKm).toLocaleString('vi-VN') + ' km' : '—'}</b></div>
                   <div>Chi phí xe: <b>{fmtVND(expTotals.total)}</b></div>
                   <div>Bảo dưỡng: <b>{fmtVND(serviceTotal)}</b></div>
+                  <div>Tổng chi xe: <b>{fmtVND(stats.totalFuel + expTotals.total + serviceTotal)}</b></div>
                 </div>
+                <h3 style={{ marginTop: 16 }}>Theo tháng</h3>
+                {stats.byMonth.length === 0 ? <div className="empty">Chưa có lần đổ xăng nào.</div>
+                  : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', borderBottom: '1px solid #ddd' }}>
+                          <th>Tháng</th><th style={{ textAlign: 'right' }}>Lần</th><th style={{ textAlign: 'right' }}>Lít</th><th style={{ textAlign: 'right' }}>Tiền xăng</th><th style={{ textAlign: 'right' }}>Km chạy</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.byMonth.map(r => (
+                          <tr key={r.month} style={{ borderBottom: '1px solid #eee' }}>
+                            <td>{r.month.slice(5, 7)}/{r.month.slice(0, 4)}{r.hasEstimate ? ' • ước tính' : ''}</td>
+                            <td style={{ textAlign: 'right' }}>{r.count}</td>
+                            <td style={{ textAlign: 'right' }}>{Number(r.litres).toLocaleString('vi-VN')}</td>
+                            <td style={{ textAlign: 'right' }}>{fmtVND(r.total)}</td>
+                            <td style={{ textAlign: 'right' }}>{r.km ? Math.round(r.km).toLocaleString('vi-VN') : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
               </div>
             )}
 
@@ -340,10 +372,12 @@ export default function XePage() {
                   : [...stats.logs].reverse().map(log => (
                     <div className="row" key={log.id}>
                       <div style={{ flex: 1 }}>
-                        <b>{log.date}</b> · {log.odometer != null ? `${Number(log.odometer).toLocaleString('vi-VN')} km` : 'không nhập km'} · {Number(log.litres).toLocaleString('vi-VN')} lít · {fmtVND(log.total)}
-                        {log.station ? <span className="muted"> · {log.station}</span> : ''}
-                        <div className="muted">Mức tiêu hao: {fmtKmL(log.kmPerLitre)}{log.kmPerLitre == null && ` (${KM_NOTE[log.kmNote] || 'chưa tính được'})`}</div>
-                        {log.note ? <div className="muted">📝 {log.note}</div> : ''}
+                        <b>{log.date}</b>{/ước tính/i.test(log.note || '') && <span> · 📊 Ước tính cả tháng</span>} · {Number(log.litres).toLocaleString('vi-VN')} lít · {fmtVND(log.total)} · {fmtKmL(log.kmPerLitre)}{log.kmPerLitre == null && ` (${KM_NOTE[log.kmNote] || 'chưa tính được'})`}
+                        <div className="muted">
+                          {log.odometer != null ? `${Number(log.odometer).toLocaleString('vi-VN')} km` : 'không nhập km'}
+                          {log.station ? ` · ${log.station}` : ''}
+                          {log.note ? ` · ${log.note}` : ''}
+                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button type="button" className="btn" onClick={() => startEditFuel(log)} style={{ width: 'auto', flex: 'none' }}>Sửa</button>

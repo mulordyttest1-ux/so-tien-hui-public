@@ -97,29 +97,43 @@ export function withEconomy(logs) {
   return sorted.map((log, i) => {
     let kmPerLitre = null;
     let kmNote = null;
+    let kmDriven = null;
     if (i === 0) kmNote = 'first';
     else if (log.odometer == null) kmNote = 'no_odo';
     else if (sorted[i - 1].odometer == null) kmNote = 'prev_no_odo';
     else {
       const km = Number(log.odometer) - Number(sorted[i - 1].odometer);
       const litres = Number(log.litres);
-      if (km > 0 && litres > 0) kmPerLitre = km / litres;
+      if (km > 0 && litres > 0) { kmPerLitre = km / litres; kmDriven = km; }
       else kmNote = 'bad_range';
     }
-    return { ...log, kmPerLitre, kmNote };
+    return { ...log, kmPerLitre, kmNote, kmDriven };
   });
 }
 
 export function fuelStats(logs) {
   const withEco = withEconomy(logs);
   const segments = withEco.filter(l => l.kmPerLitre != null);
-  const totalKm = segments.reduce((s, l, i) => {
-    const prev = withEco[withEco.indexOf(l) - 1];
-    return s + (prev ? Number(l.odometer) - Number(prev.odometer) : 0);
-  }, 0);
+  const totalKm = segments.reduce((s, l) => s + (l.kmDriven || 0), 0);
   const totalLitres = segments.reduce((s, l) => s + Number(l.litres), 0);
+  const totalFuel = withEco.reduce((s, l) => s + Number(l.total || 0), 0);
+  const totalLitresAll = withEco.reduce((s, l) => s + Number(l.litres || 0), 0);
   const monthKey = new Date().toISOString().slice(0, 7);
   const monthLogs = withEco.filter(l => String(l.date).slice(0, 7) === monthKey);
+  // Bang theo thang, moi nhat truoc. Km cua thang = tong km cua cac doan
+  // ket thuc trong thang do; thang co dong uoc tinh thi danh dau.
+  const byMonthMap = {};
+  withEco.forEach(l => {
+    const m = String(l.date).slice(0, 7);
+    if (!byMonthMap[m]) byMonthMap[m] = { month: m, count: 0, litres: 0, total: 0, km: 0, hasEstimate: false };
+    const r = byMonthMap[m];
+    r.count += 1;
+    r.litres += Number(l.litres || 0);
+    r.total += Number(l.total || 0);
+    r.km += l.kmDriven || 0;
+    if (/ước tính/i.test(l.note || '')) r.hasEstimate = true;
+  });
+  const byMonth = Object.values(byMonthMap).sort((a, b) => b.month.localeCompare(a.month));
   return {
     logs: withEco,
     avgKmPerLitre: totalLitres > 0 ? totalKm / totalLitres : null,
@@ -128,6 +142,11 @@ export function fuelStats(logs) {
     monthLitres: monthLogs.reduce((s, l) => s + Number(l.litres), 0),
     monthCount: monthLogs.length,
     totalKm,
+    totalFuel,
+    totalLitresAll,
+    totalCount: withEco.length,
+    costPerKm: totalKm > 0 ? totalFuel / totalKm : null,
+    byMonth,
   };
 }
 
