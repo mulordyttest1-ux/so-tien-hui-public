@@ -16,6 +16,14 @@ import {
 
 const EMPTY_VEHICLE = { name: '', kind: 'xe_may', make_model: '', plate: '', year: '', fuel_type: 'xang', current_odometer: '' };
 
+// Vi sao mot lan do xang khong tinh duoc muc tieu hao.
+const KM_NOTE = {
+  first: 'bình đầu tiên, chưa tính được',
+  no_odo: 'không nhập số km nên chưa tính được',
+  prev_no_odo: 'lần trước không nhập số km nên chưa tính được',
+  bad_range: 'số km không hợp lệ nên chưa tính được',
+};
+
 export default function XePage() {
   const { user, loading } = useRequireAuth();
   const [vehicles, setVehicles] = useState([]);
@@ -123,7 +131,7 @@ export default function XePage() {
 
   function startEditFuel(log) {
     setEditingFuel(log);
-    setFdate(log.date); setFodo(String(log.odometer)); setFlitres(String(log.litres));
+    setFdate(log.date); setFodo(log.odometer != null ? String(log.odometer) : ''); setFlitres(String(log.litres));
     setFprice(String(log.price_per_litre)); setFstation(log.station || ''); setFnote(log.note || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -135,7 +143,7 @@ export default function XePage() {
 
   async function saveFuel(e) {
     e.preventDefault();
-    if (!selected || !fdate || !fodo || !flitres || !fprice || busy) return;
+    if (!selected || !fdate || !flitres || !fprice || busy) return;
     setBusy(true);
     try {
       const payload = {
@@ -145,7 +153,7 @@ export default function XePage() {
       if (editingFuel) await updateFuelLog(editingFuel.id, payload);
       else {
         await addFuelLog(user.id, payload);
-        if (!selected.current_odometer || Number(fodo) > Number(selected.current_odometer)) {
+        if (fodo && (!selected.current_odometer || Number(fodo) > Number(selected.current_odometer))) {
           await updateVehicle(selected.id, { ...selected, current_odometer: fodo });
         }
       }
@@ -237,7 +245,8 @@ export default function XePage() {
       <h2>🚗 Xe cộ</h2>
       <p className="muted">
         Ghi đổ xăng, chi phí, bảo dưỡng, theo dõi mức tiêu hao từng xe. Mức tiêu hao tính theo lần đổ đầy bình:
-        số km chạy được từ lần đổ trước chia cho số lít lần này.
+        số km chạy được từ lần đổ trước chia cho số lít lần này. Không nhập số km cũng được — lần đó chỉ
+        không tính được mức tiêu hao, tiền xăng vẫn ghi đủ.
       </p>
 
       {!ready ? <div className="loading">Đang tải…</div>
@@ -290,7 +299,7 @@ export default function XePage() {
                 <h3 style={{ marginTop: 16 }}>{editingFuel ? 'Sửa lần đổ xăng' : 'Đổ xăng mới'}</h3>
                 <form onSubmit={saveFuel} style={{ display: 'grid', gap: 8 }}>
                   <label>Ngày <input type="date" value={fdate} onChange={e => setFdate(e.target.value)} required /></label>
-                  <label>Số km lúc đổ <input type="number" min="0" step="1" value={fodo} onChange={e => setFodo(e.target.value)} placeholder="VD: 45210" required style={{ width: '100%' }} /></label>
+                  <label>Số km lúc đổ (không bắt buộc) <input type="number" min="0" step="1" value={fodo} onChange={e => setFodo(e.target.value)} placeholder="VD: 45210 — nhớ thì nhập, không nhớ thì thôi" style={{ width: '100%' }} /></label>
                   <label>Số lít <input type="number" min="0" step="0.01" value={flitres} onChange={e => setFlitres(e.target.value)} placeholder="VD: 3.5" required style={{ width: '100%' }} /></label>
                   <label>Giá / lít (đ)
                     <MoneyInput value={fprice} onChange={setFprice} placeholder="VD: 20.000" />
@@ -299,7 +308,7 @@ export default function XePage() {
                   <label>Cây xăng (không bắt buộc) <input value={fstation} onChange={e => setFstation(e.target.value)} placeholder="VD: Petrolimex Nguyễn Văn Linh" style={{ width: '100%' }} /></label>
                   <label>Ghi chú (không bắt buộc) <input value={fnote} onChange={e => setFnote(e.target.value)} style={{ width: '100%' }} /></label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn" type="submit" disabled={busy || !fdate || !fodo || !flitres || !fprice} style={{ width: 'auto', flex: 'none' }}>{editingFuel ? 'Lưu sửa' : 'Lưu lần đổ xăng'}</button>
+                    <button className="btn" type="submit" disabled={busy || !fdate || !flitres || !fprice} style={{ width: 'auto', flex: 'none' }}>{editingFuel ? 'Lưu sửa' : 'Lưu lần đổ xăng'}</button>
                     {editingFuel && <button className="btn" type="button" onClick={resetFuelForm} style={{ width: 'auto', flex: 'none' }}>Hủy sửa</button>}
                   </div>
                 </form>
@@ -309,9 +318,9 @@ export default function XePage() {
                   : [...stats.logs].reverse().map(log => (
                     <div className="row" key={log.id}>
                       <div style={{ flex: 1 }}>
-                        <b>{log.date}</b> · {Number(log.odometer).toLocaleString('vi-VN')} km · {Number(log.litres).toLocaleString('vi-VN')} lít · {fmtVND(log.total)}
+                        <b>{log.date}</b> · {log.odometer != null ? `${Number(log.odometer).toLocaleString('vi-VN')} km` : 'không nhập km'} · {Number(log.litres).toLocaleString('vi-VN')} lít · {fmtVND(log.total)}
                         {log.station ? <span className="muted"> · {log.station}</span> : ''}
-                        <div className="muted">Mức tiêu hao: {fmtKmL(log.kmPerLitre)}{log.kmPerLitre == null && ' (bình đầu tiên, chưa tính được)'}</div>
+                        <div className="muted">Mức tiêu hao: {fmtKmL(log.kmPerLitre)}{log.kmPerLitre == null && ` (${KM_NOTE[log.kmNote] || 'chưa tính được'})`}</div>
                         {log.note ? <div className="muted">📝 {log.note}</div> : ''}
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -423,7 +432,7 @@ export default function XePage() {
               <option value="dien">Điện</option>
             </select>
           </label>
-          <label>Số km hiện tại <input type="number" min="0" step="1" value={vform.current_odometer} onChange={e => setVform({ ...vform, current_odometer: e.target.value })} placeholder="VD: 45210" style={{ width: '100%' }} /></label>
+          <label>Số km hiện tại (không bắt buộc) <input type="number" min="0" step="1" value={vform.current_odometer} onChange={e => setVform({ ...vform, current_odometer: e.target.value })} placeholder="VD: 45210" style={{ width: '100%' }} /></label>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" type="submit" disabled={busy || !vform.name.trim()} style={{ width: 'auto', flex: 'none' }}>Lưu xe</button>
             <button className="btn" type="button" onClick={() => { setShowVehicleForm(false); setEditingVehicle(null); }} style={{ width: 'auto', flex: 'none' }}>Hủy</button>
