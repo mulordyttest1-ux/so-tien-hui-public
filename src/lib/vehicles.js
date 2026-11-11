@@ -56,7 +56,7 @@ export async function addFuelLog(userId, log) {
     user_id: userId,
     vehicle_id: log.vehicle_id,
     date: log.date,
-    odometer: Number(log.odometer),
+    odometer: log.odometer ? Number(log.odometer) : null,
     litres: Number(log.litres),
     price_per_litre: Number(log.price_per_litre),
     total,
@@ -71,7 +71,7 @@ export async function updateFuelLog(id, log) {
   const total = Math.round(Number(log.litres) * Number(log.price_per_litre));
   const { data, error } = await supabase.from('vehicle_fuel_logs').update({
     date: log.date,
-    odometer: Number(log.odometer),
+    odometer: log.odometer ? Number(log.odometer) : null,
     litres: Number(log.litres),
     price_per_litre: Number(log.price_per_litre),
     total,
@@ -89,17 +89,24 @@ export async function deleteFuelLog(id) {
 
 // Muc tieu hao: binh i chay duoc (odo_i - odo_{i-1}) km bang so lit do o binh i.
 // Tinh theo lan do day binh; binh dau tien chua co moc truoc nen khong co so.
+// So km KHONG bat buoc: binh nao thieu km (hoac binh ngay truoc no thieu km)
+// thi khong tinh duoc muc tieu hao, kmNote giai thich vi sao.
 export function withEconomy(logs) {
   const sorted = [...(logs || [])].sort((a, b) =>
     String(a.date).localeCompare(String(b.date)) || Number(a.odometer) - Number(b.odometer));
   return sorted.map((log, i) => {
     let kmPerLitre = null;
-    if (i > 0) {
+    let kmNote = null;
+    if (i === 0) kmNote = 'first';
+    else if (log.odometer == null) kmNote = 'no_odo';
+    else if (sorted[i - 1].odometer == null) kmNote = 'prev_no_odo';
+    else {
       const km = Number(log.odometer) - Number(sorted[i - 1].odometer);
       const litres = Number(log.litres);
       if (km > 0 && litres > 0) kmPerLitre = km / litres;
+      else kmNote = 'bad_range';
     }
-    return { ...log, kmPerLitre };
+    return { ...log, kmPerLitre, kmNote };
   });
 }
 
