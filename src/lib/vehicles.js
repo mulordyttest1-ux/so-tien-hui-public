@@ -67,6 +67,21 @@ export async function addFuelLog(userId, log) {
   return data;
 }
 
+export async function updateFuelLog(id, log) {
+  const total = Math.round(Number(log.litres) * Number(log.price_per_litre));
+  const { data, error } = await supabase.from('vehicle_fuel_logs').update({
+    date: log.date,
+    odometer: Number(log.odometer),
+    litres: Number(log.litres),
+    price_per_litre: Number(log.price_per_litre),
+    total,
+    station: (log.station || '').trim() || null,
+    note: (log.note || '').trim() || null,
+  }).eq('id', id).select().single();
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteFuelLog(id) {
   const { error } = await supabase.from('vehicle_fuel_logs').delete().eq('id', id);
   if (error) throw error;
