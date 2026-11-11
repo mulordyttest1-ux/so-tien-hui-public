@@ -43,6 +43,21 @@ export default function XePage() {
   const [fstation, setFstation] = useState('');
   const [fnote, setFnote] = useState('');
   const [editingFuel, setEditingFuel] = useState(null);
+  // Gia xang chinh thuc hien tai (E10-V vung 2), lay tu /api/gia-xang de tu dien
+  // vao o gia/lit; null = dang lay, false = lay khong duoc (nhap tay).
+  const [giaXang, setGiaXang] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/gia-xang').then(r => r.json()).then(d => {
+      if (alive && d && d.price) setGiaXang(d);
+    }).catch(() => { if (alive) setGiaXang(false); });
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
+    if (giaXang && typeof giaXang === 'object' && !fprice && !editingFuel) {
+      setFprice(String(giaXang.price));
+    }
+  }, [giaXang]);
   // Chi phi
   const [edate, setEdate] = useState(todayISO());
   const [ecat, setEcat] = useState(EXPENSE_CATEGORIES[0]);
@@ -137,7 +152,7 @@ export default function XePage() {
   }
   function resetFuelForm() {
     setEditingFuel(null);
-    setFdate(todayISO()); setFlitres(''); setFprice(''); setFstation(''); setFnote('');
+    setFdate(todayISO()); setFlitres(''); setFprice(giaXang && typeof giaXang === 'object' ? String(giaXang.price) : ''); setFstation(''); setFnote('');
     setFodo(selected?.current_odometer ? String(selected.current_odometer) : '');
   }
 
@@ -304,6 +319,13 @@ export default function XePage() {
                   <label>Giá / lít (đ)
                     <MoneyInput value={fprice} onChange={setFprice} placeholder="VD: 20.000" />
                   </label>
+                  {giaXang === null ? (
+                    <div className="muted">Đang lấy giá xăng chính thức…</div>
+                  ) : giaXang === false ? (
+                    <div className="muted">Không lấy được giá xăng mới — nhập tay nhé.</div>
+                  ) : (
+                    <div className="muted">Giá chính thức E10-V vùng 2: {fmtVND(giaXang.price)}/lít (từ {String(giaXang.effectiveDate).split('-').reverse().join('/')}){giaXang.fallback ? ' — giá cũ, chưa lấy được giá mới, kiểm lại nhé' : ''}. Sửa lại nếu cây xăng rẻ hơn.</div>
+                  )}
                   <div>Tổng tiền: <b>{ftotal > 0 ? fmtVND(Math.round(ftotal)) : '—'}</b></div>
                   <label>Cây xăng (không bắt buộc) <input value={fstation} onChange={e => setFstation(e.target.value)} placeholder="VD: Petrolimex Nguyễn Văn Linh" style={{ width: '100%' }} /></label>
                   <label>Ghi chú (không bắt buộc) <input value={fnote} onChange={e => setFnote(e.target.value)} style={{ width: '100%' }} /></label>
