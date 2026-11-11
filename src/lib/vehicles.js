@@ -1,0 +1,114 @@
+// Xe co (giai doan 1): xe + nhat ky do xang + tinh muc tieu hao.
+// Multi-vehicle ngay tu dau; moi nguoi chi thay xe cua minh (RLS).
+import { supabase } from './supabaseClient';
+
+export async function fetchVehicles() {
+  const { data, error } = await supabase.from('vehicles')
+    .select('*').order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addVehicle(userId, v) {
+  const { data, error } = await supabase.from('vehicles').insert({
+    user_id: userId,
+    name: (v.name || '').trim(),
+    kind: v.kind || 'xe_may',
+    make_model: (v.make_model || '').trim() || null,
+    plate: (v.plate || '').trim() || null,
+    year: v.year ? Number(v.year) : null,
+    fuel_type: v.fuel_type || 'xang',
+    current_odometer: v.current_odometer ? Number(v.current_odometer) : null,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateVehicle(id, v) {
+  const { error } = await supabase.from('vehicles').update({
+    name: (v.name || '').trim(),
+    kind: v.kind || 'xe_may',
+    make_model: (v.make_model || '').trim() || null,
+    plate: (v.plate || '').trim() || null,
+    year: v.year ? Number(v.year) : null,
+    fuel_type: v.fuel_type || 'xang',
+    current_odometer: v.current_odometer ? Number(v.current_odometer) : null,
+  }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteVehicle(id) {
+  const { error } = await supabase.from('vehicles').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function fetchFuelLogs(vehicleId) {
+  const { data, error } = await supabase.from('vehicle_fuel_logs')
+    .select('*').eq('vehicle_id', vehicleId)
+    .order('date', { ascending: true }).order('odometer', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addFuelLog(userId, log) {
+  const total = Math.round(Number(log.litres) * Number(log.price_per_litre));
+  const { data, error } = await supabase.from('vehicle_fuel_logs').insert({
+    user_id: userId,
+    vehicle_id: log.vehicle_id,
+    date: log.date,
+    odometer: Number(log.odometer),
+    litres: Number(log.litres),
+    price_per_litre: Number(log.price_per_litre),
+    total,
+    station: (log.station || '').trim() || null,
+    note: (log.note || '').trim() || null,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteFuelLog(id) {
+  const { error } = await supabase.from('vehicle_fuel_logs').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Muc tieu hao: binh i chay duoc (odo_i - odo_{i-1}) km bang so lit do o binh i.
+// Tinh theo lan do day binh; binh dau tien chua co moc truoc nen khong co so.
+export function withEconomy(logs) {
+  const sorted = [...(logs || [])].sort((a, b) =>
+    String(a.date).localeCompare(String(b.date)) || Number(a.odometer) - Number(b.odometer));
+  return sorted.map((log, i) => {
+    let kmPerLitre = null;
+    if (i > 0) {
+      const km = Number(log.odometer) - Number(sorted[i - 1].odometer);
+      const litres = Number(log.litres);
+      if (km > 0 && litres > 0) kmPerLitre = km / litres;
+    }
+    return { ...log, kmPerLitre };
+  });
+}
+
+export function fuelStats(logs) {
+  const withEco = withEconomy(logs);
+  const segments = withEco.filter(l => l.kmPerLitre != null);
+  const totalKm = segments.reduce((s, l, i) => {
+    const prev = withEco[withEco.indexOf(l) - 1];
+    return s + (prev ? Number(l.odometer) - Number(prev.odometer) : 0);
+  }, 0);
+  const totalLitres = segments.reduce((s, l) => s + Number(l.litres), 0);
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const monthLogs = withEco.filter(l => String(l.date).slice(0, 7) === monthKey);
+  return {
+    logs: withEco,
+    avgKmPerLitre: totalLitres > 0 ? totalKm / totalLitres : null,
+    latestKmPerLitre: segments.length ? segments[segments.length - 1].kmPerLitre : null,
+    monthTotal: monthLogs.reduce((s, l) => s + Number(l.total), 0),
+    monthLitres: monthLogs.reduce((s, l) => s + Number(l.litres), 0),
+    monthCount: monthLogs.length,
+    totalKm,
+  };
+}
+
+export function kindLabel(kind) {
+  return kind === 'o_to' ? 'Ô tô' : kind === 'khac' ? 'Xe khác' : 'Xe máy';
+}
