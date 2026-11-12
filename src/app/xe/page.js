@@ -323,18 +323,50 @@ export default function XePage() {
 
             {selected && (
               <div className="card" style={{ marginTop: 12 }}>
+                <h3>{editingFuel ? '✏️ Sửa lần đổ xăng' : '⛽ Đổ xăng mới'}</h3>
+                <p className="muted">Nhập số tiền đã đổ, app tự tính số lít theo giá.</p>
+                <form onSubmit={saveFuel} style={{ display: 'grid', gap: 8 }}>
+                  <label>Ngày <input type="date" value={fdate} onChange={e => setFdate(e.target.value)} required /></label>
+                  <label>Số km lúc đổ (không bắt buộc) <input type="number" min="0" step="1" value={fodo} onChange={e => setFodo(e.target.value)} placeholder="VD: 45210 — nhớ thì nhập, không nhớ thì thôi" style={{ width: '100%' }} /></label>
+                  <label>Số tiền đổ (đ)
+                    <MoneyInput value={ftotal} onChange={onTotalChange} placeholder="VD: 600.000" />
+                  </label>
+                  <label>Giá / lít (đ)
+                    <MoneyInput value={fprice} onChange={onPriceChange} placeholder="VD: 20.000" />
+                  </label>
+                  {giaXang === null ? (
+                    <div className="muted">Đang lấy giá xăng chính thức…</div>
+                  ) : giaXang === false ? (
+                    <div className="muted">Không lấy được giá xăng mới — nhập tay nhé.</div>
+                  ) : (
+                    <div className="muted">Giá chính thức E10-V vùng 2: {fmtVND(giaXang.price)}/lít (từ {String(giaXang.effectiveDate).split('-').reverse().join('/')}){giaXang.fallback ? ' — giá cũ, chưa lấy được giá mới, kiểm lại nhé' : ''}. Sửa lại nếu cây xăng rẻ hơn.</div>
+                  )}
+                  <label>Số lít <input type="number" min="0" step="0.01" value={flitres} onChange={e => onLitresChange(e.target.value)} placeholder="Tự tính từ số tiền" required style={{ width: '100%' }} /></label>
+                  <div className="muted">Số lít tự tính từ số tiền và giá — sửa lại nếu có hóa đơn.</div>
+                  <label>Cây xăng (không bắt buộc) <input value={fstation} onChange={e => setFstation(e.target.value)} placeholder="VD: Petrolimex Nguyễn Văn Linh" style={{ width: '100%' }} /></label>
+                  <label>Ghi chú (không bắt buộc) <input value={fnote} onChange={e => setFnote(e.target.value)} style={{ width: '100%' }} /></label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn" type="submit" disabled={busy || !fdate || !flitres || !fprice} style={{ width: 'auto', flex: 'none', background: 'var(--gold)' }}>{editingFuel ? 'Lưu sửa' : 'Lưu lần đổ xăng'}</button>
+                    {editingFuel && <button className="btn" type="button" onClick={resetFuelForm} style={{ width: 'auto', flex: 'none' }}>Hủy sửa</button>}
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {selected && (
+              <div className="card" style={{ marginTop: 12 }}>
                 <b>📊 Thống kê</b>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
-                  <div>Tổng tiền xăng: <b>{fmtVND(stats.totalFuel)}</b></div>
-                  <div>Tổng lít: <b>{Number(stats.totalLitresAll).toLocaleString('vi-VN')} lít</b> ({stats.totalCount} lần)</div>
-                  <div>Đã chạy: <b>{stats.totalKm ? Math.round(stats.totalKm).toLocaleString('vi-VN') + ' km' : '—'}</b></div>
-                  <div>⛽ Trung bình: <b>{fmtKmL(stats.avgKmPerLitre)}</b></div>
-                  <div>Tiền/km: <b>{stats.costPerKm ? fmtVND(Math.round(stats.costPerKm)) + '/km' : '—'}</b></div>
-                  <div>Bình gần nhất: <b>{fmtKmL(stats.latestKmPerLitre)}</b></div>
-                  <div>Xăng tháng này: <b>{fmtVND(stats.monthTotal)}</b>{stats.monthLitres > 0 && <span className="muted"> ({Number(stats.monthLitres).toLocaleString('vi-VN')} lít, {stats.monthCount} lần)</span>}</div>
-                  <div>Chi phí xe: <b>{fmtVND(expTotals.total)}</b></div>
-                  <div>Bảo dưỡng: <b>{fmtVND(serviceTotal)}</b></div>
-                  <div>Tổng chi xe: <b>{fmtVND(stats.totalFuel + expTotals.total + serviceTotal)}</b></div>
+                <div className="stat-grid">
+                  <div className="stat-card hero"><div className="stat-label">Tổng chi xe</div><div className="stat-value">{fmtVND(stats.totalFuel + expTotals.total + serviceTotal)}</div></div>
+                  <div className="stat-card"><div className="stat-label">Tổng tiền xăng</div><div className="stat-value">{fmtVND(stats.totalFuel)}</div></div>
+                  <div className="stat-card"><div className="stat-label">Tổng lít ({stats.totalCount} lần)</div><div className="stat-value">{Number(stats.totalLitresAll).toLocaleString('vi-VN')} lít</div></div>
+                  <div className="stat-card"><div className="stat-label">Đã chạy</div><div className="stat-value">{stats.totalKm ? Math.round(stats.totalKm).toLocaleString('vi-VN') + ' km' : '—'}</div></div>
+                  <div className="stat-card"><div className="stat-label">⛽ Trung bình</div><div className="stat-value">{fmtKmL(stats.avgKmPerLitre)}</div></div>
+                  <div className="stat-card"><div className="stat-label">Tiền/km</div><div className="stat-value">{stats.costPerKm ? fmtVND(Math.round(stats.costPerKm)) + '/km' : '—'}</div></div>
+                  <div className="stat-card"><div className="stat-label">Bình gần nhất</div><div className="stat-value">{fmtKmL(stats.latestKmPerLitre)}</div></div>
+                  <div className="stat-card"><div className="stat-label">Xăng tháng này</div><div className="stat-value">{fmtVND(stats.monthTotal)}</div>{stats.monthLitres > 0 && <div className="stat-label">{Number(stats.monthLitres).toLocaleString('vi-VN')} lít · {stats.monthCount} lần</div>}</div>
+                  <div className="stat-card"><div className="stat-label">Chi phí xe</div><div className="stat-value">{fmtVND(expTotals.total)}</div></div>
+                  <div className="stat-card"><div className="stat-label">Bảo dưỡng</div><div className="stat-value">{fmtVND(serviceTotal)}</div></div>
                 </div>
                 <h3 style={{ marginTop: 16 }}>Theo tháng</h3>
                 {stats.byMonth.length === 0 ? <div className="empty">Chưa có lần đổ xăng nào.</div>
@@ -363,34 +395,6 @@ export default function XePage() {
 
             {selected && (
               <>
-                <h3 style={{ marginTop: 16 }}>{editingFuel ? 'Sửa lần đổ xăng' : 'Đổ xăng mới'}</h3>
-                <p className="muted">Nhập số tiền đã đổ, app tự tính số lít theo giá.</p>
-                <form onSubmit={saveFuel} style={{ display: 'grid', gap: 8 }}>
-                  <label>Ngày <input type="date" value={fdate} onChange={e => setFdate(e.target.value)} required /></label>
-                  <label>Số km lúc đổ (không bắt buộc) <input type="number" min="0" step="1" value={fodo} onChange={e => setFodo(e.target.value)} placeholder="VD: 45210 — nhớ thì nhập, không nhớ thì thôi" style={{ width: '100%' }} /></label>
-                  <label>Số tiền đổ (đ)
-                    <MoneyInput value={ftotal} onChange={onTotalChange} placeholder="VD: 600.000" />
-                  </label>
-                  <label>Giá / lít (đ)
-                    <MoneyInput value={fprice} onChange={onPriceChange} placeholder="VD: 20.000" />
-                  </label>
-                  {giaXang === null ? (
-                    <div className="muted">Đang lấy giá xăng chính thức…</div>
-                  ) : giaXang === false ? (
-                    <div className="muted">Không lấy được giá xăng mới — nhập tay nhé.</div>
-                  ) : (
-                    <div className="muted">Giá chính thức E10-V vùng 2: {fmtVND(giaXang.price)}/lít (từ {String(giaXang.effectiveDate).split('-').reverse().join('/')}){giaXang.fallback ? ' — giá cũ, chưa lấy được giá mới, kiểm lại nhé' : ''}. Sửa lại nếu cây xăng rẻ hơn.</div>
-                  )}
-                  <label>Số lít <input type="number" min="0" step="0.01" value={flitres} onChange={e => onLitresChange(e.target.value)} placeholder="Tự tính từ số tiền" required style={{ width: '100%' }} /></label>
-                  <div className="muted">Số lít tự tính từ số tiền và giá — sửa lại nếu có hóa đơn.</div>
-                  <label>Cây xăng (không bắt buộc) <input value={fstation} onChange={e => setFstation(e.target.value)} placeholder="VD: Petrolimex Nguyễn Văn Linh" style={{ width: '100%' }} /></label>
-                  <label>Ghi chú (không bắt buộc) <input value={fnote} onChange={e => setFnote(e.target.value)} style={{ width: '100%' }} /></label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn" type="submit" disabled={busy || !fdate || !flitres || !fprice} style={{ width: 'auto', flex: 'none' }}>{editingFuel ? 'Lưu sửa' : 'Lưu lần đổ xăng'}</button>
-                    {editingFuel && <button className="btn" type="button" onClick={resetFuelForm} style={{ width: 'auto', flex: 'none' }}>Hủy sửa</button>}
-                  </div>
-                </form>
-
                 <h3 style={{ marginTop: 16 }}>Lịch sử đổ xăng</h3>
                 {stats.logs.length === 0 ? <div className="empty">Chưa có lần đổ xăng nào cho xe này.</div>
                   : [...stats.logs].reverse().map(log => (
