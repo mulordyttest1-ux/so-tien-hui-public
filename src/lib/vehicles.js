@@ -51,7 +51,8 @@ export async function fetchFuelLogs(vehicleId) {
 }
 
 export async function addFuelLog(userId, log) {
-  const total = Math.round(Number(log.litres) * Number(log.price_per_litre));
+  // Tong tien uu tien so chi nhap (tien la goc), khong thi tinh tu lit x gia.
+  const total = log.total != null && log.total !== '' ? Math.round(Number(log.total)) : Math.round(Number(log.litres) * Number(log.price_per_litre));
   const { data, error } = await supabase.from('vehicle_fuel_logs').insert({
     user_id: userId,
     vehicle_id: log.vehicle_id,
@@ -68,7 +69,7 @@ export async function addFuelLog(userId, log) {
 }
 
 export async function updateFuelLog(id, log) {
-  const total = Math.round(Number(log.litres) * Number(log.price_per_litre));
+  const total = log.total != null && log.total !== '' ? Math.round(Number(log.total)) : Math.round(Number(log.litres) * Number(log.price_per_litre));
   const { data, error } = await supabase.from('vehicle_fuel_logs').update({
     date: log.date,
     odometer: log.odometer ? Number(log.odometer) : null,
