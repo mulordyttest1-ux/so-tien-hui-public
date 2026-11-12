@@ -182,7 +182,7 @@ export default function XePage() {
     setBusy(true);
     try {
       const payload = {
-        vehicle_id: selected.id, date: fdate, odometer: fodo,
+        vehicle_id: selected.id, vehicle_name: selected.name, date: fdate, odometer: fodo,
         litres, price_per_litre: fprice, total: ftotal, station: fstation, note: fnote,
       };
       if (editingFuel) await updateFuelLog(editingFuel.id, payload);
@@ -221,7 +221,7 @@ export default function XePage() {
     setBusy(true);
     try {
       const payload = {
-        vehicle_id: selected.id, date: edate, category: ecat,
+        vehicle_id: selected.id, vehicle_name: selected.name, date: edate, category: ecat,
         amount: eamount, odometer: eodo, note: enote,
       };
       if (editingExpense) await updateVehicleExpense(editingExpense.id, payload);
@@ -255,7 +255,7 @@ export default function XePage() {
     setBusy(true);
     try {
       const payload = {
-        vehicle_id: selected.id, date: sdate, title: stitle,
+        vehicle_id: selected.id, vehicle_name: selected.name, date: sdate, title: stitle,
         total: stotal, odometer: sodo, note: snote,
       };
       if (editingService) await updateVehicleService(editingService.id, payload);
@@ -324,7 +324,7 @@ export default function XePage() {
             {selected && (
               <div className="card" style={{ marginTop: 12 }}>
                 <h3>{editingFuel ? '✏️ Sửa lần đổ xăng' : '⛽ Đổ xăng mới'}</h3>
-                <p className="muted">Nhập số tiền đã đổ, app tự tính số lít theo giá.</p>
+                <p className="muted">Nhập số tiền đã đổ, app tự tính số lít theo giá và tự ghi vào Sổ tiền.</p>
                 <form onSubmit={saveFuel} style={{ display: 'grid', gap: 8 }}>
                   <label>Ngày <input type="date" value={fdate} onChange={e => setFdate(e.target.value)} required /></label>
                   <label>Số km lúc đổ (không bắt buộc) <input type="number" min="0" step="1" value={fodo} onChange={e => setFodo(e.target.value)} placeholder="VD: 45210 — nhớ thì nhập, không nhớ thì thôi" style={{ width: '100%' }} /></label>
@@ -417,6 +417,7 @@ export default function XePage() {
                   ))}
 
                 <h3 style={{ marginTop: 16 }}>{editingExpense ? 'Sửa chi phí' : 'Chi phí mới'}</h3>
+                <div className="muted">Tiền lời ngân hàng hàng tháng đóng ở Định kỳ nhé — đóng xong tự vào lịch sử xe luôn, khỏi nhập 2 lần. Khoản nào cũng tự ghi vào Sổ tiền.</div>
                 <form onSubmit={saveExpense} style={{ display: 'grid', gap: 8 }}>
                   <label>Ngày <input type="date" value={edate} onChange={e => setEdate(e.target.value)} required /></label>
                   <label>Loại chi phí

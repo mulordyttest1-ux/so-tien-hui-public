@@ -8,6 +8,7 @@ import {
   updateRecurringItem, deleteRecurringItem, recordRecurringPayment,
   RECURRING_KIND_LABELS, daysUntil,
 } from '../../lib/recurring';
+import { addVehicleExpense } from '../../lib/vehicleExpenses';
 import { fmtVND, todayISO, thisMonthRange } from '../../lib/format';
 
 const EMPTY = {
@@ -66,6 +67,23 @@ export default function DinhKyPage() {
       await recordRecurringPayment(paying.item, user.id, {
         amount: Number(payAmount), date: payDate, skipTx, principal: paying.principal,
       });
+      // Khoan dinh ky gan voi xe (VD Tien loi ngan hang cua Mazda CX-3):
+      // ghi them vao lich su chi phi xe de trang Xe thay duoc. Khong tao
+      // them giao dich so tien — recordRecurringPayment da tao roi.
+      // Chi ghi log ky (skipTx) thi thoi, tranh trung voi khoan da co.
+      if (paying.item.vehicle_id && !skipTx) {
+        try {
+          await addVehicleExpense(user.id, {
+            vehicle_id: paying.item.vehicle_id,
+            date: payDate,
+            category: paying.principal ? 'Tiền gốc ngân hàng' : 'Tiền lời ngân hàng',
+            amount: Number(payAmount),
+            note: 'Đóng ở Định kỳ',
+          }, { skipTx: true });
+        } catch (e2) {
+          alert('Đã ghi đóng kỳ vào sổ, nhưng chưa ghi được vào lịch sử xe: ' + e2.message);
+        }
+      }
       setPaying(null); await load();
     } catch (err) { alert('Không ghi được: ' + err.message); }
     finally { setBusy(false); }

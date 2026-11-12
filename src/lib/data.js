@@ -92,3 +92,15 @@ export async function deleteHuiRound(roundId) {
   const { error } = await supabase.from('hui_rounds').delete().eq('id', roundId);
   if (error) throw error;
 }
+
+// Ghi 1 khoan chi vao so tien (tap me) cho cac module con (xe, ...):
+// module giu bang rieng cua no, so tien giu giao dich that de tong
+// thu chi thang gom het cac khoan. Tra ve giao dich da tao.
+export async function createLedgerTx(userId, { vehicleId, date, amount, note }) {
+  const { data, error } = await supabase.from('transactions').insert({
+    user_id: userId, type: 'chi', amount: Math.round(Number(amount)), date,
+    vehicle_id: vehicleId || null, note: note || '', status: 'confirmed',
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
