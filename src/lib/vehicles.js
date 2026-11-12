@@ -1,6 +1,9 @@
 // Xe co (giai doan 1): xe + nhat ky do xang + tinh muc tieu hao.
 // Multi-vehicle ngay tu dau; moi nguoi chi thay xe cua minh (RLS).
+// Nguyen tac tap con: moi lan do xang dong thoi la 1 khoan chi trong
+// so tien (tap me) de tong thu chi thang gom het.
 import { supabase } from './supabaseClient';
+import { createLedgerTx } from './data';
 
 export async function fetchVehicles() {
   const { data, error } = await supabase.from('vehicles')
@@ -50,9 +53,19 @@ export async function fetchFuelLogs(vehicleId) {
   return data || [];
 }
 
-export async function addFuelLog(userId, log) {
+export async function addFuelLog(userId, log, opts = {}) {
   // Tong tien uu tien so chi nhap (tien la goc), khong thi tinh tu lit x gia.
   const total = log.total != null && log.total !== '' ? Math.round(Number(log.total)) : Math.round(Number(log.litres) * Number(log.price_per_litre));
+  // Ghi khoan chi vao so tien truoc (tru khi skipTx: dong xe nay da co
+  // giao dich so tien roi, VD dong o Dinh ky); neu luu log loi thi don tx.
+  let txId = null;
+  if (!opts.skipTx) {
+    const tx = await createLedgerTx(userId, {
+      vehicleId: log.vehicle_id, date: log.date, amount: total,
+      note: `Đổ xăng ${log.vehicle_name || 'xe'} · ${Number(log.litres).toLocaleString('vi-VN')} lít`,
+    });
+    txId = tx.id;
+  }
   const { data, error } = await supabase.from('vehicle_fuel_logs').insert({
     user_id: userId,
     vehicle_id: log.vehicle_id,
@@ -63,8 +76,12 @@ export async function addFuelLog(userId, log) {
     total,
     station: (log.station || '').trim() || null,
     note: (log.note || '').trim() || null,
+    transaction_id: txId,
   }).select().single();
-  if (error) throw error;
+  if (error) {
+    if (txId) await supabase.from('transactions').delete().eq('id', txId);
+    throw error;
+  }
   return data;
 }
 
@@ -80,10 +97,26 @@ export async function updateFuelLog(id, log) {
     note: (log.note || '').trim() || null,
   }).eq('id', id).select().single();
   if (error) throw error;
+  // Chi dong bo khi lan do nay da co giao dich so tien (tao sau khi noi);
+  // du lieu cu (transaction_id null) giu nguyen, khong tao them giao dich.
+  if (data.transaction_id) {
+    const { error: txErr } = await supabase.from('transactions').update({
+      amount: total, date: log.date,
+      note: `Đổ xăng ${log.vehicle_name || 'xe'} · ${Number(log.litres).toLocaleString('vi-VN')} lít`,
+    }).eq('id', data.transaction_id);
+    if (txErr) throw txErr;
+  }
   return data;
 }
 
 export async function deleteFuelLog(id) {
+  // Xoa luon giao dich so tien lien ket (neu co) de tong thang khong lech.
+  const { data: row } = await supabase.from('vehicle_fuel_logs')
+    .select('transaction_id').eq('id', id).single();
+  if (row && row.transaction_id) {
+    const { error: txErr } = await supabase.from('transactions').delete().eq('id', row.transaction_id);
+    if (txErr) throw txErr;
+  }
   const { error } = await supabase.from('vehicle_fuel_logs').delete().eq('id', id);
   if (error) throw error;
 }
