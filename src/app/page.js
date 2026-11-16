@@ -108,7 +108,7 @@ export default function DashboardPage() {
             { href: '/bao-cao', icon: '📊', name: 'Báo cáo', hint: 'Tổng quan theo tháng' },
             { href: '/quet-qr', icon: '📷', name: 'Quét QR', hint: 'Quét mã để chuyển tiền' },
             { href: '/chuyen-nhanh', icon: '⚡', name: 'Chuyển nhanh', hint: 'Chuyển tiền không cần quét' },
-            { href: '/viec-can-lam', icon: '✅', name: 'Việc cần làm', hint: todos.filter(t => !t.done).length ? `${todos.filter(t => !t.done).length} việc chưa xong` : 'Chưa có việc nào' },
+            { href: '/viec-can-lam', icon: '📝', name: 'Ghi chú', hint: todos.filter(t => !t.done).length ? `${todos.filter(t => !t.done).length} việc chưa xong` : 'Chưa có việc nào' },
             { href: '/xe', icon: '🚗', name: 'Xe cộ', hint: vehicles.length ? `${vehicles.length} xe · ghi đổ xăng, xem km/lít` : 'Chưa có xe' },
             { href: '/tro-ly-groq', icon: '🚀', name: 'Trợ lý Groq', hint: 'Hỏi về sổ, hạn đóng, quỹ nhóm…' },
             { href: 'https://muse.ai', icon: '💬', name: 'Nhờ Muse', hint: 'Mở Muse để hỏi / nhờ làm', external: true },
