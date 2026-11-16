@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 
-// Thanh duoi 4 muc: Tong quan, Tinh nhanh, Groq, Xe (ghep Xe vi hay dung).
+// Thanh duoi 5 muc: Tong quan, Tinh nhanh, Groq, Xe, Ghi chu (ghi chu
+// la nhac nho viec hang ngay, chi hay dung nen ghep vao thanh duoi).
 // Nut camera noi (FAB) da bo han: quet QR chi con o trong trang chinh
 // (o Quet QR -> trang /quet-qr), vi hien tai camera quet tren iPhone
 // chua dung duoc, de sau sua.
@@ -12,6 +13,7 @@ const BAR_TABS = [
   { href: '/tinh-nhanh', label: 'Tính nhanh', icon: '🧮' },
   { href: '/tro-ly-groq', label: 'Groq', icon: '⚡' },
   { href: '/xe', label: 'Xe cộ', icon: '🚗' },
+  { href: '/viec-can-lam', label: 'Ghi chú', icon: '📝' },
 ];
 
 export default function AppShell({ children, userEmail }) {
